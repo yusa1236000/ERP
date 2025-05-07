@@ -972,6 +972,39 @@ const routes = [
                 component: () => import("../views/manufacturing/WorkOrderDashboard.vue"),
                 meta: { requiresAuth: true },
               },
+            // Currency Rates Module
+            {
+                path: "/currency-rates",
+                name: "CurrencyRates",
+                component: () => import("../views/accounting/CurrencyRatesList.vue"),
+                meta: { requiresAuth: true },
+            },
+            {
+                path: "/currency-rates/create",
+                name: "CreateCurrencyRate",
+                component: () => import("../views/accounting/CurrencyRateForm.vue"),
+                meta: { requiresAuth: true },
+            },
+            {
+                path: "/currency-rates/:id",
+                name: "CurrencyRateDetail",
+                component: () => import("../views/accounting/CurrencyRateDetail.vue"),
+                props: true,
+                meta: { requiresAuth: true },
+            },
+            {
+                path: "/currency-rates/:id/edit",
+                name: "EditCurrencyRate",
+                component: () => import("../views/accounting/CurrencyRateForm.vue"),
+                props: true,
+                meta: { requiresAuth: true },
+            },
+            {
+                path: "/currency-converter",
+                name: "CurrencyConverter",
+                component: () => import("../views/accounting/CurrencyConverter.vue"),
+                meta: { requiresAuth: true },
+            },
             // Admin Routes
             {
                 path: "admin/users",
