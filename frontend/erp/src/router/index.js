@@ -15,15 +15,15 @@ import UnitOfMeasureDetail from "../views/inventory/UnitOfMeasureDetail.vue";
 // import PriceComparison from "../views/inventory/PriceComparison.vue";
 import ItemPriceManagement from "../views/inventory/ItemPriceManagement.vue";
 //import StockTransactions from "../views/inventory/StockTransactions.vue";
-import StockTransactionsList from '../views/inventory/StockTransactionsList.vue';
-import StockTransactionForm from '../views/inventory/StockTransactionForm.vue';
-import StockTransactionDetail from '../views/inventory/StockTransactionDetail.vue';
+import StockTransactionsList from "../views/inventory/StockTransactionsList.vue";
+import StockTransactionForm from "../views/inventory/StockTransactionForm.vue";
+import StockTransactionDetail from "../views/inventory/StockTransactionDetail.vue";
 import StockAdjustmentList from "../views/inventory/StockAdjustmentList.vue";
 import StockAdjustmentForm from "../views/inventory/StockAdjustmentForm.vue";
 import StockAdjustmentDetail from "../views/inventory/StockAdjustmentDetail.vue";
 import StockAdjustmentApproval from "../views/inventory/StockAdjustmentApproval.vue";
-import ItemMovementHistory from '../views/inventory/ItemMovementHistory.vue';
-import StockTransferForm from '../views/inventory/StockTransferForm.vue';
+import ItemMovementHistory from "../views/inventory/ItemMovementHistory.vue";
+import StockTransferForm from "../views/inventory/StockTransferForm.vue";
 //import StockAdjustments from "../views/inventory/StockAdjustments.vue";
 import ItemCategories from "../views/inventory/ItemCategories.vue";
 import ItemCategoriesEnhanced from "../views/inventory/ItemCategoriesEnhanced.vue";
@@ -50,6 +50,7 @@ import SalesInvoiceList from "../views/sales/SalesInvoiceList.vue";
 import SalesInvoiceDetail from "../views/sales/SalesInvoiceDetail.vue";
 import SalesInvoiceForm from "../views/sales/SalesInvoiceForm.vue";
 import SalesInvoicePrint from "../views/sales/SalesInvoicePrint.vue";
+import SalesOrderPrint from "../views/sales/SalesOrderPrint.vue";
 //Sales Delivery
 import DeliveryList from "../views/sales/DeliveryList.vue";
 import DeliveryDetail from "../views/sales/DeliveryDetail.vue";
@@ -80,7 +81,7 @@ import RFQCompare from "../views/purchasing/RFQCompare.vue";
 // import PurchaseOrderDetail from '@/views/purchasing/PurchaseOrderDetail.vue';
 // import PurchaseOrderFormView from '@/views/purchasing/PurchaseOrderFormView.vue';
 // import PurchaseOrderTrack from '@/views/purchasing/PurchaseOrderTrack.vue';
-import CreatePOFromQuotation from '@/views/purchasing/CreatePOFromQuotation.vue';
+import CreatePOFromQuotation from "@/views/purchasing/CreatePOFromQuotation.vue";
 
 //GoodReceipt
 import GoodsReceiptList from "../views/purchasing/GoodsReceiptList.vue";
@@ -194,7 +195,7 @@ const routes = [
                 path: "/item-prices-management",
                 name: "ItemPriceManagement",
                 component: ItemPriceManagement,
-                meta: { requiresAuth: true }
+                meta: { requiresAuth: true },
             },
             // {
             //     path: "warehouses",
@@ -214,32 +215,32 @@ const routes = [
             //     component: StockTransactions,
             // },
             {
-                path: '/stock-transactions',
-                name: 'StockTransactions',
-                component: StockTransactionsList
-              },
-              {
-                path: '/stock-transactions/create',
-                name: 'CreateStockTransaction',
-                component: StockTransactionForm
-              },
-              {
-                path: '/stock-transactions/:id',
-                name: 'StockTransactionDetail',
+                path: "/stock-transactions",
+                name: "StockTransactions",
+                component: StockTransactionsList,
+            },
+            {
+                path: "/stock-transactions/create",
+                name: "CreateStockTransaction",
+                component: StockTransactionForm,
+            },
+            {
+                path: "/stock-transactions/:id",
+                name: "StockTransactionDetail",
                 component: StockTransactionDetail,
-                props: true
-              },
-              {
-                path: '/stock-transactions/items/:itemId/movement',
-                name: 'ItemMovementHistory',
+                props: true,
+            },
+            {
+                path: "/stock-transactions/items/:itemId/movement",
+                name: "ItemMovementHistory",
                 component: ItemMovementHistory,
-                props: true
-              },
-              {
-                path: '/stock-transactions/transfer',
-                name: 'StockTransfer',
-                component: StockTransferForm
-              },
+                props: true,
+            },
+            {
+                path: "/stock-transactions/transfer",
+                name: "StockTransfer",
+                component: StockTransferForm,
+            },
             {
                 path: "/sales/customers",
                 name: "customers.index",
@@ -275,35 +276,35 @@ const routes = [
                 path: "stock-adjustments",
                 name: "StockAdjustments",
                 component: StockAdjustmentList,
-                meta: { requiresAuth: true }
-              },
-              {
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "stock-adjustments/create",
                 name: "CreateStockAdjustment",
                 component: StockAdjustmentForm,
-                meta: { requiresAuth: true }
-              },
-              {
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "stock-adjustments/:id",
                 name: "StockAdjustmentDetail",
                 component: StockAdjustmentDetail,
                 props: true,
-                meta: { requiresAuth: true }
-              },
-              {
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "stock-adjustments/:id/edit",
                 name: "EditStockAdjustment",
                 component: StockAdjustmentForm,
                 props: true,
-                meta: { requiresAuth: true }
-              },
-              {
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "stock-adjustments/:id/approve",
                 name: "ApproveStockAdjustment",
                 component: StockAdjustmentApproval,
                 props: true,
-                meta: { requiresAuth: true }
-              },
+                meta: { requiresAuth: true },
+            },
             {
                 path: "/sales/quotations",
                 name: "SalesQuotations",
@@ -380,6 +381,13 @@ const routes = [
                 path: "/sales/orders/create-from-quotation/:id",
                 name: "CreateOrderFromQuotation",
                 component: CreateOrderFromQuotation,
+                props: true,
+                meta: { requiresAuth: true },
+            },
+            {
+                path: "/sales/orders/:id/print",
+                name: "PrintSalesOrder",
+                component: SalesOrderPrint,
                 props: true,
                 meta: { requiresAuth: true },
             },
@@ -519,28 +527,28 @@ const routes = [
                 path: "/manufacturing/boms",
                 name: "BOMList",
                 component: BOMList,
-                meta: { requiresAuth: true }
-              },
-              {
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "/manufacturing/boms/create",
                 name: "CreateBOM",
                 component: BOMForm,
-                meta: { requiresAuth: true }
-              },
-              {
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "/manufacturing/boms/:id",
                 name: "BOMDetail",
                 component: BOMDetail,
                 props: true,
-                meta: { requiresAuth: true }
-              },
-              {
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "/manufacturing/boms/:id/edit",
                 name: "EditBOM",
                 component: BOMForm,
                 props: true,
-                meta: { requiresAuth: true }
-              },
+                meta: { requiresAuth: true },
+            },
             {
                 path: "purchasing/vendors",
                 name: "VendorList",
@@ -685,11 +693,11 @@ const routes = [
             //     meta: { requiresAuth: true }
             // },
             {
-                path: '/purchasing/quotations/:id/create-po',
-                name: 'CreatePOFromQuotation',
+                path: "/purchasing/quotations/:id/create-po",
+                name: "CreatePOFromQuotation",
                 component: CreatePOFromQuotation,
                 props: true,
-                meta: { requiresAuth: true }
+                meta: { requiresAuth: true },
             },
             // Goods Receipts Routes
             {
@@ -830,48 +838,54 @@ const routes = [
                 component: ZonesList,
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/warehouses/:warehouseId/zones/:zoneId",
                 name: "WarehouseLocations",
                 component: LocationsList,
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/warehouses/:warehouseId/zones/:zoneId/locations/:locationId/inventory",
                 name: "LocationInventory",
                 component: LocationInventory,
                 props: true,
                 meta: { requiresAuth: true },
-              },
+            },
 
             // Material Planning routes
             {
                 path: "/materials/plans",
                 name: "MaterialPlans",
-                component: () => import("../views/inventory/MaterialPlanningList.vue"),
-                meta: { requiresAuth: true }
+                component: () =>
+                    import("../views/inventory/MaterialPlanningList.vue"),
+                meta: { requiresAuth: true },
             },
             {
                 path: "/materials/plans/:id",
                 name: "MaterialPlanDetail",
-                component: () => import("../views/inventory/MaterialPlanDetails.vue"),
+                component: () =>
+                    import("../views/inventory/MaterialPlanDetails.vue"),
                 props: true,
-                meta: { requiresAuth: true }
+                meta: { requiresAuth: true },
             },
             // Material Planning routes
             {
                 path: "/materials/plans/generate",
                 name: "MaterialPlanGeneration",
-                component: () => import("../views/inventory/MaterialPlanGeneration.vue"),
-                meta: { requiresAuth: true }
+                component: () =>
+                    import("../views/inventory/MaterialPlanGeneration.vue"),
+                meta: { requiresAuth: true },
             },
             {
                 path: "/purchasing/requisitions/generate-from-material-plan",
                 name: "PRGenerationFromMaterialPlan",
-                component: () => import("../views/inventory/PRGenerationFromMaterialPlan.vue"),
-                meta: { requiresAuth: true }
+                component: () =>
+                    import(
+                        "../views/inventory/PRGenerationFromMaterialPlan.vue"
+                    ),
+                meta: { requiresAuth: true },
             },
             // Routing Management Routes
             {
@@ -903,106 +917,122 @@ const routes = [
             {
                 path: "/manufacturing/work-centers",
                 name: "WorkCentersList",
-                component: () => import("../views/manufacturing/WorkCentersList.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkCentersList.vue"),
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-centers/create",
                 name: "CreateWorkCenter",
-                component: () => import("../views/manufacturing/WorkCenterForm.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkCenterForm.vue"),
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-centers/:id",
                 name: "WorkCenterDetail",
-                component: () => import("../views/manufacturing/WorkCenterDetail.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkCenterDetail.vue"),
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-centers/:id/edit",
                 name: "EditWorkCenter",
-                component: () => import("../views/manufacturing/WorkCenterForm.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkCenterForm.vue"),
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-centers/:id/schedule",
                 name: "WorkCenterSchedule",
-                component: () => import("../views/manufacturing/WorkCenterSchedule.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkCenterSchedule.vue"),
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-orders",
                 name: "WorkOrders",
-                component: () => import("../views/manufacturing/WorkOrderList.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkOrderList.vue"),
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-orders/create",
                 name: "CreateWorkOrder",
-                component: () => import("../views/manufacturing/WorkOrderForm.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkOrderForm.vue"),
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-orders/:id",
                 name: "WorkOrderDetail",
-                component: () => import("../views/manufacturing/WorkOrderDetail.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkOrderDetail.vue"),
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-orders/:id/edit",
                 name: "EditWorkOrder",
-                component: () => import("../views/manufacturing/WorkOrderForm.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkOrderForm.vue"),
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/work-orders/:workOrderId/operations/:operationId",
                 name: "WorkOrderOperation",
-                component: () => import("../views/manufacturing/WorkOrderOperationForm.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkOrderOperationForm.vue"),
                 props: true,
                 meta: { requiresAuth: true },
-              },
-              {
+            },
+            {
                 path: "/manufacturing/dashboard",
                 name: "ManufacturingDashboard",
-                component: () => import("../views/manufacturing/WorkOrderDashboard.vue"),
+                component: () =>
+                    import("../views/manufacturing/WorkOrderDashboard.vue"),
                 meta: { requiresAuth: true },
-              },
+            },
             // Currency Rates Module
             {
                 path: "/currency-rates",
                 name: "CurrencyRates",
-                component: () => import("../views/accounting/CurrencyRatesList.vue"),
+                component: () =>
+                    import("../views/accounting/CurrencyRatesList.vue"),
                 meta: { requiresAuth: true },
             },
             {
                 path: "/currency-rates/create",
                 name: "CreateCurrencyRate",
-                component: () => import("../views/accounting/CurrencyRateForm.vue"),
+                component: () =>
+                    import("../views/accounting/CurrencyRateForm.vue"),
                 meta: { requiresAuth: true },
             },
             {
                 path: "/currency-rates/:id",
                 name: "CurrencyRateDetail",
-                component: () => import("../views/accounting/CurrencyRateDetail.vue"),
+                component: () =>
+                    import("../views/accounting/CurrencyRateDetail.vue"),
                 props: true,
                 meta: { requiresAuth: true },
             },
             {
                 path: "/currency-rates/:id/edit",
                 name: "EditCurrencyRate",
-                component: () => import("../views/accounting/CurrencyRateForm.vue"),
+                component: () =>
+                    import("../views/accounting/CurrencyRateForm.vue"),
                 props: true,
                 meta: { requiresAuth: true },
             },
             {
                 path: "/currency-converter",
                 name: "CurrencyConverter",
-                component: () => import("../views/accounting/CurrencyConverter.vue"),
+                component: () =>
+                    import("../views/accounting/CurrencyConverter.vue"),
                 meta: { requiresAuth: true },
             },
             // Admin Routes
