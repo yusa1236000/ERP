@@ -1,6 +1,9 @@
-<!-- src/views/sales/SalesOrderDetail.vue - Complete Template -->
+<!-- src/views/sales/SalesOrderDetail.vue -->
+
+<!-- ==================== TEMPLATE SECTION ==================== -->
 <template>
     <div class="order-detail">
+        <!-- Page Header -->
         <div class="page-header">
             <h1>Detail Order</h1>
             <div class="page-actions">
@@ -43,6 +46,14 @@
                         <i class="fas fa-file-invoice-dollar"></i> Buat Faktur
                     </button>
 
+                    <button
+                        v-if="canEdit && (order.status === 'Draft' || order.status === 'Confirmed')"
+                        class="btn btn-secondary"
+                        @click="showCurrencyModal"
+                    >
+                        <i class="fas fa-exchange-alt"></i> Konversi Mata Uang
+                    </button>
+
                     <button class="btn btn-secondary" @click="printOrder">
                         <i class="fas fa-print"></i> Cetak
                     </button>
@@ -50,10 +61,12 @@
             </div>
         </div>
 
+        <!-- Loading State -->
         <div v-if="isLoading" class="loading-indicator">
             <i class="fas fa-spinner fa-spin"></i> Memuat data order...
         </div>
 
+        <!-- Empty State -->
         <div v-else-if="!order" class="empty-state">
             <div class="empty-icon">
                 <i class="fas fa-exclamation-circle"></i>
@@ -65,8 +78,9 @@
             </button>
         </div>
 
+        <!-- Order Content -->
         <div v-else class="order-container">
-            <!-- Order Header -->
+            <!-- Order Header Information -->
             <div class="detail-card">
                 <div class="card-header">
                     <h2>Informasi Order</h2>
@@ -131,6 +145,21 @@
                                 {{ order.payment_terms || "-" }}
                             </div>
                         </div>
+
+                        <!-- Currency fields -->
+                        <div class="info-group">
+                            <label>Mata Uang</label>
+                            <div class="info-value">
+                                {{ order.currencyCode || "IDR" }}
+                            </div>
+                        </div>
+
+                        <div class="info-group" v-if="order.exchangeRate && order.currencyCode !== order.baseCurrency">
+                            <label>Kurs</label>
+                            <div class="info-value">
+                                1 {{ order.currencyCode }} = {{ order.exchangeRate }} {{ order.baseCurrency || "IDR" }}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -153,6 +182,13 @@
                             <label>Kode Pelanggan</label>
                             <div class="info-value">
                                 {{ order.customer.customerCode }}
+                            </div>
+                        </div>
+
+                        <div class="info-group" v-if="order.customer.preferredCurrency">
+                            <label>Mata Uang Pilihan</label>
+                            <div class="info-value">
+                                {{ order.customer.preferredCurrency }}
                             </div>
                         </div>
 
@@ -198,6 +234,9 @@
             <div class="detail-card">
                 <div class="card-header">
                     <h2>Item Order</h2>
+                    <div v-if="order.currencyCode && order.currencyCode !== 'IDR'" class="currency-badge">
+                        {{ order.currencyCode }}
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="order-items">
@@ -230,7 +269,7 @@
                                         </div>
                                     </td>
                                     <td class="right">
-                                        {{ formatCurrency(line.unitPrice) }}
+                                        {{ formatCurrency(line.unitPrice, order.currencyCode) }}
                                     </td>
                                     <td class="right">{{ line.quantity }}</td>
                                     <td class="center">
@@ -239,22 +278,22 @@
                                     <td class="right">
                                         {{
                                             line.discount
-                                                ? formatCurrency(line.discount)
+                                                ? formatCurrency(line.discount, order.currencyCode)
                                                 : "-"
                                         }}
                                     </td>
                                     <td class="right">
                                         {{
                                             line.tax
-                                                ? formatCurrency(line.tax)
+                                                ? formatCurrency(line.tax, order.currencyCode)
                                                 : "-"
                                         }}
                                     </td>
                                     <td class="right">
-                                        {{ formatCurrency(line.subtotal) }}
+                                        {{ formatCurrency(line.subtotal, order.currencyCode) }}
                                     </td>
                                     <td class="right">
-                                        {{ formatCurrency(line.total) }}
+                                        {{ formatCurrency(line.total, order.currencyCode) }}
                                     </td>
                                 </tr>
                             </tbody>
@@ -265,7 +304,7 @@
                                     </td>
                                     <td colspan="2" class="totals-value">
                                         {{
-                                            formatCurrency(calculateSubtotal())
+                                            formatCurrency(calculateSubtotal(), order.currencyCode)
                                         }}
                                     </td>
                                 </tr>
@@ -276,7 +315,7 @@
                                     <td colspan="2" class="totals-value">
                                         {{
                                             formatCurrency(
-                                                calculateTotalDiscount()
+                                                calculateTotalDiscount(), order.currencyCode
                                             )
                                         }}
                                     </td>
@@ -287,7 +326,7 @@
                                     </td>
                                     <td colspan="2" class="totals-value">
                                         {{
-                                            formatCurrency(calculateTotalTax())
+                                            formatCurrency(calculateTotalTax(), order.currencyCode)
                                         }}
                                     </td>
                                 </tr>
@@ -296,7 +335,16 @@
                                         Total
                                     </td>
                                     <td colspan="2" class="totals-value">
-                                        {{ formatCurrency(order.totalAmount) }}
+                                        {{ formatCurrency(order.totalAmount, order.currencyCode) }}
+                                    </td>
+                                </tr>
+                                <!-- Base currency totals if different currency -->
+                                <tr v-if="order.baseCurrencyTotal && order.currencyCode !== order.baseCurrency">
+                                    <td colspan="6" class="totals-label">
+                                        Total ({{ order.baseCurrency || "IDR" }})
+                                    </td>
+                                    <td colspan="2" class="totals-value">
+                                        {{ formatCurrency(order.baseCurrencyTotal, order.baseCurrency) }}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -399,7 +447,7 @@
                                     </td>
                                     <td>
                                         {{
-                                            formatCurrency(invoice.total_amount)
+                                            formatCurrency(invoice.total_amount, invoice.currency_code || order.currencyCode)
                                         }}
                                     </td>
                                     <td>
@@ -428,8 +476,59 @@
             @confirm="confirmOrderAction"
             @close="closeConfirmModal"
         />
+
+        <!-- Currency Conversion Modal -->
+        <div v-if="showCurrencyConversionModal" class="modal">
+            <div class="modal-backdrop" @click="closeCurrencyModal"></div>
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2>Konversi Mata Uang</h2>
+                    <button class="close-btn" @click="closeCurrencyModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="target_currency">Pilih Mata Uang Target</label>
+                        <select id="target_currency" v-model="targetCurrency" class="form-control">
+                            <option value="IDR">IDR - Indonesian Rupiah</option>
+                            <option value="USD">USD - US Dollar</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="SGD">SGD - Singapore Dollar</option>
+                            <option value="JPY">JPY - Japanese Yen</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" v-model="useExchangeRateDate">
+                            Gunakan kurs pada tanggal order
+                        </label>
+                        <small class="text-muted d-block">
+                            Jika tidak dicentang, akan menggunakan kurs hari ini
+                        </small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" @click="closeCurrencyModal">
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary"
+                            @click="convertCurrency"
+                            :disabled="isConverting"
+                        >
+                            {{ isConverting ? "Memproses..." : "Konversi" }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
+
+<!-- ==================== SCRIPT SECTION ==================== -->
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -437,6 +536,9 @@ import axios from "axios";
 
 export default {
     name: "SalesOrderDetail",
+    components: {
+        ConfirmationModal: () => import("@/components/common/ConfirmationModal.vue")
+    },
     setup() {
         const router = useRouter();
         const route = useRoute();
@@ -446,6 +548,12 @@ export default {
         const unitOfMeasures = ref([]);
         const isLoading = ref(true);
         const showConfirmModal = ref(false);
+
+        // Currency conversion
+        const showCurrencyConversionModal = ref(false);
+        const targetCurrency = ref("IDR");
+        const useExchangeRateDate = ref(true);
+        const isConverting = ref(false);
 
         // Computed properties
         const canEdit = computed(() => {
@@ -493,6 +601,11 @@ export default {
                     `orders/${route.params.id}`
                 );
                 order.value = toCamelCase(orderResponse.data.data);
+
+                // Set default target currency
+                if (order.value.currencyCode) {
+                    targetCurrency.value = order.value.currencyCode;
+                }
             } catch (error) {
                 console.error("Error loading order:", error);
                 order.value = null;
@@ -513,10 +626,12 @@ export default {
         };
 
         // Format currency
-        const formatCurrency = (value) => {
+        const formatCurrency = (value, currencyCode = "IDR") => {
             return new Intl.NumberFormat("id-ID", {
                 style: "currency",
-                currency: "IDR",
+                currency: currencyCode || "IDR",
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
             }).format(value || 0);
         };
 
@@ -612,7 +727,7 @@ export default {
             }
         };
 
-const viewDelivery = (delivery) => {
+        const viewDelivery = (delivery) => {
             if (delivery && delivery.deliveryId !== undefined && delivery.deliveryId !== null) {
                 router.push(`/sales/deliveries/${delivery.deliveryId}`);
             } else {
@@ -638,7 +753,7 @@ const viewDelivery = (delivery) => {
             showConfirmModal.value = false;
         };
 
-const confirmOrderAction = async () => {
+        const confirmOrderAction = async () => {
             try {
                 // Mapping data ke format backend (snake_case dan nama field sesuai)
                 const payload = {
@@ -650,6 +765,7 @@ const confirmOrderAction = async () => {
                     delivery_terms: order.value.deliveryTerms || null,
                     expected_delivery: order.value.expectedDelivery || null,
                     status: "Confirmed",
+                    currency_code: order.value.currencyCode || "IDR",
                     lines: order.value.salesOrderLines.map(line => ({
                         line_id: line.lineId || null,
                         item_id: line.item.itemId,
@@ -686,6 +802,53 @@ const confirmOrderAction = async () => {
             router.push(`/sales/invoices/create?order_id=${order.value.soId}`);
         };
 
+        // Currency conversion methods
+        const showCurrencyModal = () => {
+            showCurrencyConversionModal.value = true;
+        };
+
+        const closeCurrencyModal = () => {
+            showCurrencyConversionModal.value = false;
+        };
+
+        const convertCurrency = async () => {
+            try {
+                isConverting.value = true;
+
+                // Check if already in target currency
+                if (order.value.currencyCode === targetCurrency.value) {
+                    alert("Order sudah dalam mata uang yang dipilih");
+                    closeCurrencyModal();
+                    return;
+                }
+
+                await axios.post(
+                    `orders/${order.value.soId}/convert-currency`,
+                    {
+                        currency_code: targetCurrency.value,
+                        use_exchange_rate_date: useExchangeRateDate.value
+                    }
+                );
+
+                // Reload the order
+                await loadData();
+
+                closeCurrencyModal();
+                alert(`Order berhasil dikonversi ke mata uang ${targetCurrency.value}`);
+            } catch (error) {
+                console.error("Error converting currency:", error);
+                let errorMessage = "Terjadi kesalahan saat mengkonversi mata uang";
+
+                if (error.response && error.response.data && error.response.data.message) {
+                    errorMessage = error.response.data.message;
+                }
+
+                alert(errorMessage);
+            } finally {
+                isConverting.value = false;
+            }
+        };
+
         onMounted(() => {
             loadData();
         });
@@ -697,9 +860,12 @@ const confirmOrderAction = async () => {
             hasDeliveries,
             hasInvoices,
             showConfirmModal,
+            showCurrencyConversionModal,
+            targetCurrency,
+            useExchangeRateDate,
+            isConverting,
             formatDate,
             formatCurrency,
-            getUomSymbol,
             getStatusLabel,
             getStatusClass,
             calculateSubtotal,
@@ -716,10 +882,16 @@ const confirmOrderAction = async () => {
             confirmOrderAction,
             createDelivery,
             createInvoice,
+            showCurrencyModal,
+            closeCurrencyModal,
+            convertCurrency,
+            getUomSymbol,
         };
-    },
+    }
 };
 </script>
+
+<!-- ==================== STYLE SECTION ==================== -->
 <style scoped>
 .order-detail {
     padding: 1rem 0;
@@ -998,6 +1170,7 @@ const confirmOrderAction = async () => {
 
 .loading-indicator i {
     margin-right: 0.5rem;
+    animation: spin 1s linear infinite;
 }
 
 .empty-state {
@@ -1027,6 +1200,124 @@ const confirmOrderAction = async () => {
     font-size: 0.875rem;
 }
 
+.currency-badge {
+    background-color: #dbeafe;
+    color: #2563eb;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 50;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    z-index: 60;
+    overflow: hidden;
+    max-width: 600px;
+}
+
+.modal-sm {
+    max-width: 400px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1e293b;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+}
+
+.close-btn:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #1e293b;
+}
+
+.form-group .form-control {
+    width: 100%;
+    padding: 0.625rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.text-muted {
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 @media (max-width: 768px) {
     .page-header {
         flex-direction: column;
@@ -1053,6 +1344,11 @@ const confirmOrderAction = async () => {
     .related-table {
         display: block;
         overflow-x: auto;
+    }
+
+    .modal-content {
+        margin: 0 1rem;
+        max-width: calc(100% - 2rem);
     }
 }
 </style>

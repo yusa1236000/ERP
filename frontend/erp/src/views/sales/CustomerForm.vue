@@ -4,14 +4,14 @@
     <form @submit.prevent="handleSubmit">
       <div class="form-section">
         <h3 class="section-title">Basic Information</h3>
-        
+
         <div class="form-row">
           <div class="form-group">
             <label for="customer_code">Customer Code*</label>
-            <input 
-              type="text" 
-              id="customer_code" 
-              v-model="formData.customer_code" 
+            <input
+              type="text"
+              id="customer_code"
+              v-model="formData.customer_code"
               required
               :disabled="isEditMode"
               placeholder="e.g., CUST001"
@@ -20,13 +20,13 @@
               {{ errors.customer_code }}
             </div>
           </div>
-          
+
           <div class="form-group">
             <label for="name">Name*</label>
-            <input 
-              type="text" 
-              id="name" 
-              v-model="formData.name" 
+            <input
+              type="text"
+              id="name"
+              v-model="formData.name"
               required
               placeholder="Full customer name"
             />
@@ -36,15 +36,15 @@
           </div>
         </div>
       </div>
-      
+
       <div class="form-section">
         <h3 class="section-title">Contact Information</h3>
-        
+
         <div class="form-group">
           <label for="address">Address</label>
-          <textarea 
-            id="address" 
-            v-model="formData.address" 
+          <textarea
+            id="address"
+            v-model="formData.address"
             rows="3"
             placeholder="Street address, city, state, zip code"
           ></textarea>
@@ -52,27 +52,27 @@
             {{ errors.address }}
           </div>
         </div>
-        
+
         <div class="form-row">
           <div class="form-group">
             <label for="contact_person">Contact Person</label>
-            <input 
-              type="text" 
-              id="contact_person" 
-              v-model="formData.contact_person" 
+            <input
+              type="text"
+              id="contact_person"
+              v-model="formData.contact_person"
               placeholder="Primary contact name"
             />
             <div v-if="errors.contact_person" class="error-message">
               {{ errors.contact_person }}
             </div>
           </div>
-          
+
           <div class="form-group">
             <label for="tax_id">Tax ID</label>
-            <input 
-              type="text" 
-              id="tax_id" 
-              v-model="formData.tax_id" 
+            <input
+              type="text"
+              id="tax_id"
+              v-model="formData.tax_id"
               placeholder="Tax identification number"
             />
             <div v-if="errors.tax_id" class="error-message">
@@ -80,27 +80,27 @@
             </div>
           </div>
         </div>
-        
+
         <div class="form-row">
           <div class="form-group">
             <label for="phone">Phone</label>
-            <input 
-              type="text" 
-              id="phone" 
-              v-model="formData.phone" 
+            <input
+              type="text"
+              id="phone"
+              v-model="formData.phone"
               placeholder="Phone number"
             />
             <div v-if="errors.phone" class="error-message">
               {{ errors.phone }}
             </div>
           </div>
-          
+
           <div class="form-group">
             <label for="email">Email</label>
-            <input 
-              type="email" 
-              id="email" 
-              v-model="formData.email" 
+            <input
+              type="email"
+              id="email"
+              v-model="formData.email"
               placeholder="Email address"
             />
             <div v-if="errors.email" class="error-message">
@@ -109,26 +109,40 @@
           </div>
         </div>
       </div>
-      
-      <div class="form-section">
-        <h3 class="section-title">Status</h3>
-        
-        <div class="form-group">
-          <div class="toggle-switch">
-            <input 
-              type="checkbox" 
-              id="is_active" 
-              v-model="isActive"
-              class="toggle-input" 
-            />
-            <label for="is_active" class="toggle-label">
-              <span class="toggle-inner"></span>
-              <span class="toggle-switch-label">{{ isActive ? 'Active' : 'Inactive' }}</span>
-            </label>
+
+        <div class="form-section">
+          <h3 class="section-title">Status</h3>
+
+          <div class="form-group">
+            <div class="toggle-switch">
+              <input
+                type="checkbox"
+                id="is_active"
+                v-model="isActive"
+                class="toggle-input"
+              />
+              <label for="is_active" class="toggle-label">
+                <span class="toggle-inner"></span>
+                <span class="toggle-switch-label">{{ isActive ? 'Active' : 'Inactive' }}</span>
+              </label>
+            </div>
           </div>
         </div>
-      </div>
-      
+
+        <div class="form-section">
+          <h3 class="section-title">Payment Term</h3>
+          <div class="form-group">
+            <select id="payment_term" v-model="formData.payment_term" required>
+              <option :value="30">30 days</option>
+              <option :value="60">60 days</option>
+              <option :value="90">90 days</option>
+            </select>
+            <div v-if="errors.payment_term" class="error-message">
+              {{ errors.payment_term }}
+            </div>
+          </div>
+        </div>
+
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" @click="cancel">
           Cancel
@@ -175,13 +189,14 @@ export default {
       contact_person: '',
       phone: '',
       email: '',
-      status: 'Active'
+      status: 'Active',
+      payment_term: 30
     });
-    
+
     // Form state
     const isActive = ref(true);
     const errors = ref({});
-    
+
     // Initialize form with customer data if provided
     const initForm = () => {
       if (props.customer) {
@@ -195,66 +210,66 @@ export default {
           email: props.customer.email || '',
           status: props.customer.status || 'Active'
         };
-        
+
         isActive.value = formData.value.status === 'Active';
       }
     };
-    
+
     // Watch for customer prop changes
     watch(() => props.customer, () => {
       initForm();
     }, { deep: true });
-    
+
     // Watch for server errors
     watch(() => props.serverErrors, (newErrors) => {
       errors.value = { ...newErrors };
     }, { deep: true });
-    
+
     // Watch active status toggle
     watch(isActive, (newValue) => {
       formData.value.status = newValue ? 'Active' : 'Inactive';
     });
-    
+
     // Form submission
     const handleSubmit = () => {
       // Basic validation
       const validationErrors = {};
-      
+
       if (!formData.value.customer_code) {
         validationErrors.customer_code = 'Customer code is required';
       }
-      
+
       if (!formData.value.name) {
         validationErrors.name = 'Name is required';
       }
-      
+
       if (formData.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.value.email)) {
         validationErrors.email = 'Invalid email format';
       }
-      
+
       // If validation errors exist, update errors and stop submission
       if (Object.keys(validationErrors).length > 0) {
         errors.value = validationErrors;
         return;
       }
-      
+
       // Clear validation errors
       errors.value = {};
-      
+
       // Emit submit event with form data
       emit('submit', { ...formData.value });
     };
-    
+
     // Cancel form
     const cancel = () => {
       emit('cancel');
     };
-    
+
     // Initialize form on component mount
     onMounted(() => {
       initForm();
     });
-    
+
     return {
       formData,
       isActive,

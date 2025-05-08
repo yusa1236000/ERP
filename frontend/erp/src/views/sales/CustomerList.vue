@@ -129,30 +129,38 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <form @submit.prevent="saveCustomer">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customer_code"
-                                    >Customer Code*</label
-                                >
-                                <input
-                                    type="text"
-                                    id="customer_code"
-                                    v-model="customerForm.customer_code"
-                                    required
-                                    :disabled="isEditMode"
-                                />
-                            </div>
-                            <div class="form-group">
-                                <label for="name">Name*</label>
-                                <input
-                                    type="text"
-                                    id="name"
-                                    v-model="customerForm.name"
-                                    required
-                                />
-                            </div>
-                        </div>
+<form @submit.prevent="saveCustomer">
+    <div class="form-row">
+        <div class="form-group">
+            <label for="customer_code"
+                >Customer Code*</label
+            >
+            <input
+                type="text"
+                id="customer_code"
+                v-model="customerForm.customer_code"
+                required
+                :disabled="isEditMode"
+            />
+        </div>
+        <div class="form-group">
+            <label for="name">Name*</label>
+            <input
+                type="text"
+                id="name"
+                v-model="customerForm.name"
+                required
+            />
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="payment_term">Payment Term</label>
+        <select id="payment_term" v-model="customerForm.payment_term" required>
+            <option :value="30">30 days</option>
+            <option :value="60">60 days</option>
+            <option :value="90">90 days</option>
+        </select>
+    </div>
 
                         <div class="form-group">
                             <label for="address">Address</label>
@@ -769,16 +777,17 @@ export default {
         const showDeleteModal = ref(false);
         const showDetailsModal = ref(false);
         const isEditMode = ref(false);
-        const customerForm = ref({
-            customer_code: "",
-            name: "",
-            address: "",
-            tax_id: "",
-            contact_person: "",
-            phone: "",
-            email: "",
-            status: "Active",
-        });
+const customerForm = ref({
+    customer_code: "",
+    name: "",
+    address: "",
+    tax_id: "",
+    contact_person: "",
+    phone: "",
+    email: "",
+    status: "Active",
+    payment_term: 30,
+});
         const isActive = ref(true);
         const customerToDelete = ref({});
         const selectedCustomer = ref(null);
@@ -885,44 +894,46 @@ export default {
             searchQuery.value = "";
         };
 
-        const openAddCustomerModal = () => {
-            isEditMode.value = false;
-            customerForm.value = {
-                customer_code: "",
-                name: "",
-                address: "",
-                tax_id: "",
-                contact_person: "",
-                phone: "",
-                email: "",
-                status: "Active",
-            };
-            isActive.value = true;
-            showCustomerModal.value = true;
-        };
+const openAddCustomerModal = () => {
+    isEditMode.value = false;
+    customerForm.value = {
+        customer_code: "",
+        name: "",
+        address: "",
+        tax_id: "",
+        contact_person: "",
+        phone: "",
+        email: "",
+        status: "Active",
+        payment_term: 30,
+    };
+    isActive.value = true;
+    showCustomerModal.value = true;
+};
 
-        const editCustomer = (customer) => {
-            isEditMode.value = true;
-            customerForm.value = {
-                customer_id: customer.customer_id,
-                customer_code: customer.customer_code,
-                name: customer.name,
-                address: customer.address || "",
-                tax_id: customer.tax_id || "",
-                contact_person: customer.contact_person || "",
-                phone: customer.phone || "",
-                email: customer.email || "",
-                status: customer.status,
-            };
-            isActive.value = customer.status === "Active";
+const editCustomer = (customer) => {
+    isEditMode.value = true;
+    customerForm.value = {
+        customer_id: customer.customer_id,
+        customer_code: customer.customer_code,
+        name: customer.name,
+        address: customer.address || "",
+        tax_id: customer.tax_id || "",
+        contact_person: customer.contact_person || "",
+        phone: customer.phone || "",
+        email: customer.email || "",
+        status: customer.status,
+        payment_term: customer.payment_term || 30,
+    };
+    isActive.value = customer.status === "Active";
 
-            // Close details modal if open
-            if (showDetailsModal.value) {
-                showDetailsModal.value = false;
-            }
+    // Close details modal if open
+    if (showDetailsModal.value) {
+        showDetailsModal.value = false;
+    }
 
-            showCustomerModal.value = true;
-        };
+    showCustomerModal.value = true;
+};
 
         const closeCustomerModal = () => {
             showCustomerModal.value = false;
