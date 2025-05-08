@@ -391,6 +391,14 @@ const routes = [
                 props: true,
                 meta: { requiresAuth: true },
             },
+            {
+                path: "/sales/deliveries/:id/print",
+                name: "PrintDeliveryOrder",
+                component: () =>
+                    import("../views/sales/DeliveryOrderPrint.vue"),
+                props: true,
+                meta: { requiresAuth: true },
+            },
             //SalesInvoice
             {
                 path: "/sales/invoices",
