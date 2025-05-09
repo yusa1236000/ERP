@@ -1,4 +1,4 @@
-<!-- src/views/sales/SalesInvoiceForm.vue -->
+<!-- Template section of SalesInvoiceForm.vue -->
 <template>
     <div class="invoice-form">
         <div class="page-header">
@@ -127,7 +127,18 @@
                             />
                         </div>
 
-                        <div class="form-group" v-if="isEditMode">
+                        <div class="form-group">
+                            <label for="currency_code">Currency*</label>
+                            <select id="currency_code" v-model="form.currency_code" required>
+                                <option v-for="currency in currencies" :key="currency" :value="currency">
+                                    {{ currency }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" v-if="isEditMode">
+                        <div class="form-group">
                             <label for="status">Status*</label>
                             <select id="status" v-model="form.status" required>
                                 <option value="Draft">Draft</option>
@@ -139,6 +150,14 @@
                                 <option value="Overdue">Overdue</option>
                                 <option value="Cancelled">Cancelled</option>
                             </select>
+                        </div>
+
+                        <div class="form-group" v-if="form.exchange_rate">
+                            <label>Exchange Rate</label>
+                            <div class="exchange-rate-display">
+                                <span>{{ form.exchange_rate }}</span>
+                                <span class="text-muted">({{ form.currency_code }} to {{ form.base_currency }})</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -166,7 +185,7 @@
                     <div v-else class="invoice-lines">
                         <div class="line-headers">
                             <div class="line-header">Item</div>
-                            <div class="line-header">Unit Price</div>
+                            <div class="line-header">Unit Price ({{ form.currency_code || 'Default' }})</div>
                             <div class="line-header">Quantity</div>
                             <div class="line-header">UOM</div>
                             <div class="line-header">Discount</div>
@@ -254,11 +273,11 @@
                             </div>
 
                             <div class="line-item subtotal">
-                                {{ formatCurrency(line.subtotal) }}
+                                {{ formatCurrency(line.subtotal, form.currency_code) }}
                             </div>
 
                             <div class="line-item total">
-                                {{ formatCurrency(line.total) }}
+                                {{ formatCurrency(line.total, form.currency_code) }}
                             </div>
 
                             <div class="line-item actions">
@@ -277,27 +296,33 @@
                             <div class="total-row">
                                 <div class="total-label">Subtotal:</div>
                                 <div class="total-value">
-                                    {{ formatCurrency(calculateSubtotal()) }}
+                                    {{ formatCurrency(calculateSubtotal(), form.currency_code) }}
                                 </div>
                             </div>
                             <div class="total-row">
                                 <div class="total-label">Total Discount:</div>
                                 <div class="total-value">
                                     {{
-                                        formatCurrency(calculateTotalDiscount())
+                                        formatCurrency(calculateTotalDiscount(), form.currency_code)
                                     }}
                                 </div>
                             </div>
                             <div class="total-row">
                                 <div class="total-label">Total Tax:</div>
                                 <div class="total-value">
-                                    {{ formatCurrency(calculateTotalTax()) }}
+                                    {{ formatCurrency(calculateTotalTax(), form.currency_code) }}
                                 </div>
                             </div>
                             <div class="total-row grand-total">
                                 <div class="total-label">Total:</div>
                                 <div class="total-value">
-                                    {{ formatCurrency(calculateGrandTotal()) }}
+                                    {{ formatCurrency(calculateGrandTotal(), form.currency_code) }}
+                                </div>
+                            </div>
+                            <div class="total-row base-currency" v-if="form.currency_code && form.currency_code !== baseCurrency">
+                                <div class="total-label">Total ({{ baseCurrency }}):</div>
+                                <div class="total-value">
+                                    {{ formatCurrency(calculateGrandTotal() * (form.exchange_rate || 1), baseCurrency) }}
                                 </div>
                             </div>
                         </div>
@@ -321,7 +346,7 @@
         </div>
     </div>
 </template>
-
+// Script section of SalesInvoiceForm.vue
 <script>
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -345,6 +370,11 @@ export default {
             reference: "",
             payment_terms: "",
             status: "Draft",
+            currency_code: "",
+            exchange_rate: null,
+            base_currency: null,
+            base_currency_total: 0,
+            base_currency_tax: 0,
             lines: [],
         });
 
@@ -353,6 +383,8 @@ export default {
         const items = ref([]);
         const unitOfMeasures = ref([]);
         const salesOrders = ref([]);
+        const currencies = ref(["USD", "IDR", "EUR", "JPY", "SGD", "MYR", "CNY"]);
+        const baseCurrency = ref("USD"); // Default base currency, should be loaded from config
 
         // UI state
         const isLoading = ref(false);
@@ -392,9 +424,24 @@ export default {
                 const uomResponse = await UnitOfMeasureService.getAll();
                 unitOfMeasures.value = uomResponse.data || [];
 
+                // Get application settings including base currency
+                try {
+                    const settingsResponse = await axios.get("/settings/inventory");
+                    if (settingsResponse.data?.base_currency) {
+                        baseCurrency.value = settingsResponse.data.base_currency;
+                    }
+                } catch (settingErr) {
+                    console.warn("Could not load application settings:", settingErr);
+                }
+
                 // Load sales orders for the customer if selected
                 if (form.value.customer_id) {
-                    loadSalesOrders();
+                    await loadSalesOrders();
+                }
+
+                // Set default currency
+                if (!form.value.currency_code) {
+                    form.value.currency_code = baseCurrency.value;
                 }
             } catch (err) {
                 console.error("Error loading reference data:", err);
@@ -426,14 +473,21 @@ export default {
             form.value.so_id = "";
 
             // Load sales orders for the selected customer
-            loadSalesOrders();
+            await loadSalesOrders();
 
-            // Update payment terms from customer if available
-            if (form.value.customer_id) {
-                const customer = customers.value.find(
-                    (c) => c.customer_id === form.value.customer_id
-                );
-                if (customer && customer.payment_terms) {
+            // Find selected customer
+            const customer = customers.value.find(
+                (c) => c.customer_id === form.value.customer_id
+            );
+
+            if (customer) {
+                // Set preferred currency if available
+                if (customer.preferred_currency) {
+                    form.value.currency_code = customer.preferred_currency;
+                }
+
+                // Update payment terms from customer if available
+                if (customer.payment_terms) {
                     form.value.payment_terms = customer.payment_terms;
                 }
 
@@ -463,7 +517,7 @@ export default {
         };
 
         // Load order data when order is selected
-const loadOrderData = async () => {
+        const loadOrderData = async () => {
             if (!form.value.so_id) {
                 // Clear lines if no order selected
                 form.value.lines = [];
@@ -473,6 +527,16 @@ const loadOrderData = async () => {
             try {
                 const response = await axios.get(`/orders/${form.value.so_id}`);
                 const order = response.data.data;
+
+                // Set currency from sales order if available
+                if (order.currency_code) {
+                    form.value.currency_code = order.currency_code;
+                }
+
+                // Get exchange rate if needed
+                if (form.value.currency_code !== baseCurrency.value) {
+                    await getExchangeRate();
+                }
 
                 // Populate invoice lines from order lines, including delivered quantity
                 form.value.lines = (order.salesOrderLines || []).map(
@@ -486,20 +550,44 @@ const loadOrderData = async () => {
                             );
                         }
 
+                        // Handle currency conversion if needed
+                        let unitPrice = line.unit_price;
+
+                        // If invoice currency differs from sales order currency
+                        if (form.value.currency_code !== order.currency_code) {
+                            // Convert from sales order currency to invoice currency via base currency
+                            if (line.base_currency_unit_price) {
+                                // First get price in base currency
+                                const baseUnitPrice = line.base_currency_unit_price;
+
+                                // Then convert to invoice currency if needed
+                                if (form.value.currency_code !== baseCurrency.value && form.value.exchange_rate) {
+                                    unitPrice = baseUnitPrice / form.value.exchange_rate;
+                                } else {
+                                    unitPrice = baseUnitPrice; // Already in base currency
+                                }
+                            }
+                        }
+
                         return {
                             item_id: line.item_id,
-                            unit_price: line.unit_price,
+                            unit_price: unitPrice,
                             quantity: line.quantity,
                             uom_id: line.uom_id,
                             discount: line.discount || 0,
                             tax: line.tax || 0,
-                            subtotal: line.subtotal,
-                            total: line.total,
+                            subtotal: 0, // Will be calculated
+                            total: 0, // Will be calculated
                             so_line_id: line.line_id, // Reference to original order line
                             delivered_quantity: deliveredQuantity, // New property for delivered qty
                         };
                     }
                 );
+
+                // Calculate line totals
+                form.value.lines.forEach((line, index) => {
+                    calculateLineTotals(index);
+                });
 
                 // Update payment terms if not already set
                 if (!form.value.payment_terms && order.payment_terms) {
@@ -509,6 +597,58 @@ const loadOrderData = async () => {
             } catch (err) {
                 console.error("Error loading order data:", err);
                 error.value = "Failed to load order data.";
+            }
+        };
+
+        // Get exchange rate for current currency
+        const getExchangeRate = async () => {
+            if (!form.value.currency_code || form.value.currency_code === baseCurrency.value) {
+                form.value.exchange_rate = 1;
+                form.value.base_currency = baseCurrency.value;
+                return;
+            }
+
+            try {
+                // Get current exchange rate
+                const rateResponse = await axios.get("/accounting/currency-rates/current-rate", {
+                    params: {
+                        from_currency: form.value.currency_code,
+                        to_currency: baseCurrency.value,
+                        date: form.value.invoice_date
+                    }
+                });
+
+                if (rateResponse.data && rateResponse.data.rate) {
+                    form.value.exchange_rate = rateResponse.data.rate;
+                    form.value.base_currency = baseCurrency.value;
+                } else {
+                    // Try reverse rate
+                    const reverseRateResponse = await axios.get("/accounting/currency-rates/current-rate", {
+                        params: {
+                            from_currency: baseCurrency.value,
+                            to_currency: form.value.currency_code,
+                            date: form.value.invoice_date
+                        }
+                    });
+
+                    if (reverseRateResponse.data && reverseRateResponse.data.rate) {
+                        form.value.exchange_rate = 1 / reverseRateResponse.data.rate;
+                        form.value.base_currency = baseCurrency.value;
+                    } else {
+                        error.value = `No exchange rate found for ${form.value.currency_code} to ${baseCurrency.value}`;
+                        // Reset to base currency
+                        form.value.currency_code = baseCurrency.value;
+                        form.value.exchange_rate = 1;
+                        form.value.base_currency = baseCurrency.value;
+                    }
+                }
+            } catch (err) {
+                console.error("Error getting exchange rate:", err);
+                error.value = `Could not get exchange rate: ${err.message}`;
+                // Reset to base currency
+                form.value.currency_code = baseCurrency.value;
+                form.value.exchange_rate = 1;
+                form.value.base_currency = baseCurrency.value;
             }
         };
 
@@ -522,6 +662,11 @@ const loadOrderData = async () => {
                 const dueDate = new Date();
                 dueDate.setDate(dueDate.getDate() + 30);
                 form.value.due_date = dueDate.toISOString().substr(0, 10);
+
+                // Set default values
+                form.value.currency_code = baseCurrency.value;
+                form.value.base_currency = baseCurrency.value;
+                form.value.exchange_rate = 1;
 
                 return;
             }
@@ -546,6 +691,11 @@ const loadOrderData = async () => {
                     reference: invoice.reference || "",
                     payment_terms: invoice.payment_terms || "",
                     status: invoice.status,
+                    currency_code: invoice.currency_code || baseCurrency.value,
+                    exchange_rate: invoice.exchange_rate || 1,
+                    base_currency: invoice.base_currency || baseCurrency.value,
+                    base_currency_total: invoice.base_currency_total || 0,
+                    base_currency_tax: invoice.base_currency_tax || 0,
                     lines: [],
                 };
 
@@ -562,6 +712,10 @@ const loadOrderData = async () => {
                         subtotal: line.subtotal,
                         total: line.total,
                         so_line_id: line.so_line_id,
+                        base_currency_unit_price: line.base_currency_unit_price,
+                        base_currency_subtotal: line.base_currency_subtotal,
+                        base_currency_tax: line.base_currency_tax,
+                        base_currency_total: line.base_currency_total
                     }));
                 }
 
@@ -595,21 +749,42 @@ const loadOrderData = async () => {
         };
 
         // Update item info when item is selected
-        const updateItemInfo = (index) => {
+        const updateItemInfo = async (index) => {
             const line = form.value.lines[index];
             const selectedItem = items.value.find(
                 (item) => item.item_id === line.item_id
             );
 
             if (selectedItem) {
-                // Set unit price if it's 0 (for new lines)
-                if (line.unit_price === 0) {
-                    line.unit_price = selectedItem.sales_price || 0;
-                }
-
                 // Set UOM if not already set
                 if (!line.uom_id && selectedItem.uom_id) {
                     line.uom_id = selectedItem.uom_id;
+                }
+
+                // Set unit price if it's 0 (for new lines)
+                if (line.unit_price === 0) {
+                    try {
+                        // Try to get price in the invoice currency
+                        const priceResponse = await axios.get(`/items/${selectedItem.item_id}/best-sale-price`, {
+                            params: {
+                                customer_id: form.value.customer_id,
+                                quantity: line.quantity,
+                                currency_code: form.value.currency_code,
+                                date: form.value.invoice_date
+                            }
+                        });
+
+                        if (priceResponse.data && priceResponse.data.price) {
+                            line.unit_price = priceResponse.data.price;
+                        } else {
+                            // Fallback to default sale price
+                            line.unit_price = selectedItem.sale_price || 0;
+                        }
+                    } catch (err) {
+                        console.warn("Could not get best sale price:", err);
+                        // Use default price
+                        line.unit_price = selectedItem.sale_price || 0;
+                    }
                 }
 
                 // Calculate totals
@@ -627,6 +802,15 @@ const loadOrderData = async () => {
 
             // Calculate total (subtotal - discount + tax)
             line.total = line.subtotal - (line.discount || 0) + (line.tax || 0);
+
+            // Calculate base currency amounts if exchange rate is available
+            if (form.value.exchange_rate) {
+                line.base_currency_unit_price = line.unit_price * form.value.exchange_rate;
+                line.base_currency_subtotal = line.subtotal * form.value.exchange_rate;
+                line.base_currency_discount = (line.discount || 0) * form.value.exchange_rate;
+                line.base_currency_tax = (line.tax || 0) * form.value.exchange_rate;
+                line.base_currency_total = line.total * form.value.exchange_rate;
+            }
         };
 
         // Calculate subtotal of all lines
@@ -662,10 +846,13 @@ const loadOrderData = async () => {
         };
 
         // Format currency
-        const formatCurrency = (value) => {
+        const formatCurrency = (value, currencyCode) => {
+            const code = currencyCode || form.value.currency_code || "IDR";
             return new Intl.NumberFormat("id-ID", {
                 style: "currency",
-                currency: "IDR",
+                currency: code,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
             }).format(value || 0);
         };
 
@@ -681,7 +868,8 @@ const loadOrderData = async () => {
                 !form.value.invoice_number ||
                 !form.value.invoice_date ||
                 !form.value.customer_id ||
-                !form.value.due_date
+                !form.value.due_date ||
+                !form.value.currency_code
             ) {
                 error.value = "Please fill in all required fields.";
                 return;
@@ -710,9 +898,21 @@ const loadOrderData = async () => {
             error.value = "";
 
             try {
+                // Make sure we have a valid exchange rate
+                if (!form.value.exchange_rate && form.value.currency_code !== baseCurrency.value) {
+                    await getExchangeRate();
+                }
+
+                // Calculate base currency totals
+                const totalAmount = calculateGrandTotal();
+                const taxAmount = calculateTotalTax();
+
                 const invoiceData = {
                     ...form.value,
-                    total_amount: calculateGrandTotal(),
+                    total_amount: totalAmount,
+                    tax_amount: taxAmount,
+                    base_currency_total: totalAmount * (form.value.exchange_rate || 1),
+                    base_currency_tax: taxAmount * (form.value.exchange_rate || 1)
                 };
 
                 if (isEditMode.value) {
@@ -765,6 +965,21 @@ const loadOrderData = async () => {
             }
         );
 
+        // Watch for currency changes to update exchange rate
+        watch(
+            () => form.value.currency_code,
+            async (newVal, oldVal) => {
+                if (newVal && newVal !== oldVal) {
+                    await getExchangeRate();
+
+                    // Recalculate all line totals with new currency
+                    form.value.lines.forEach((_, index) => {
+                        calculateLineTotals(index);
+                    });
+                }
+            }
+        );
+
         onMounted(async () => {
             await loadReferenceData();
             await loadInvoice();
@@ -776,6 +991,8 @@ const loadOrderData = async () => {
             items,
             unitOfMeasures,
             salesOrders,
+            currencies,
+            baseCurrency,
             isLoading,
             isSubmitting,
             error,
@@ -793,11 +1010,12 @@ const loadOrderData = async () => {
             saveInvoice,
             loadCustomerData,
             loadOrderData,
+            getExchangeRate
         };
     },
 };
 </script>
-
+<!-- Style section of SalesInvoiceForm.vue -->
 <style scoped>
 .invoice-form {
     padding: 1rem 0;
@@ -916,6 +1134,17 @@ const loadOrderData = async () => {
     color: var(--gray-500);
     font-size: 0.75rem;
     margin-top: 0.25rem;
+}
+
+.exchange-rate-display {
+    background-color: var(--gray-100);
+    padding: 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .empty-lines {
@@ -1038,6 +1267,12 @@ const loadOrderData = async () => {
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--gray-800);
+}
+
+.base-currency .total-label,
+.base-currency .total-value {
+    font-style: italic;
+    color: var(--gray-600);
 }
 
 .form-actions {
