@@ -91,7 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Special item filters
         Route::get('/purchasable', 'App\Http\Controllers\Api\Inventory\ItemController@getPurchasableItems');
         Route::get('/sellable', 'App\Http\Controllers\Api\Inventory\ItemController@getSellableItems');
-        
+
         // Item price routes
         Route::get('/{itemId}/prices', 'App\Http\Controllers\Api\Inventory\ItemPriceController@index');
         Route::post('/{itemId}/prices', 'App\Http\Controllers\Api\Inventory\ItemPriceController@store');
@@ -142,41 +142,41 @@ Route::middleware('auth:sanctum')->group(function () {
     // Item Category Routes
     Route::get('categories/tree', [ItemCategoryController::class, 'tree']);
     Route::resource('categories', ItemCategoryController::class);
-    
+
     // Unit of Measure Routes
     Route::resource('uoms', UnitOfMeasureController::class);
-    
+
     // Item Routes
     Route::get('items/stock-levels', [ItemController::class, 'stockLevelReport']);
     Route::post('items/{id}/update-stock', [ItemController::class, 'updateStock']);
     Route::resource('items', ItemController::class);
-    
+
     // Warehouse Routes
     Route::get('warehouses/{id}/inventory', [WarehouseController::class, 'inventory']);
     Route::resource('warehouses', WarehouseController::class);
-    
+
     // Warehouse Zone Routes
     Route::resource('warehouses/{warehouse_id}/zones', WarehouseZoneController::class);
-    
+
     // Warehouse Location Routes
     Route::get('zones/{zone_id}/locations/{id}/inventory', [WarehouseLocationController::class, 'inventory']);
     Route::resource('zones/{zone_id}/locations', WarehouseLocationController::class);
-    
+
     // Item Batch Routes
     Route::get('batches/near-expiry/{days?}', [ItemBatchController::class, 'nearExpiry']);
     Route::resource('items/{item_id}/batches', ItemBatchController::class);
-    
+
     // Stock Transaction Routes
     Route::get('transactions/items/{item_id}/movement', [StockTransactionController::class, 'itemMovement']);
     Route::post('transactions/transfer', [StockTransactionController::class, 'transfer']);
     Route::resource('transactions', StockTransactionController::class);
-    
+
     // Stock Adjustment Routes
     Route::post('adjustments/{id}/submit', [StockAdjustmentController::class, 'submit']);
     Route::post('adjustments/{id}/approve', [StockAdjustmentController::class, 'approve']);
     Route::post('adjustments/{id}/reject', [StockAdjustmentController::class, 'reject']);
     Route::resource('adjustments', StockAdjustmentController::class);
-    
+
     // Cycle Counting Routes
     Route::post('cycle-counts/generate', [CycleCountingController::class, 'generateTasks']);
     Route::post('cycle-counts/{id}/submit', [CycleCountingController::class, 'submit']);
@@ -336,7 +336,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('deliveries/outstanding-so', 'Api\Sales\DeliveryController@getOutstandingSalesOrders');
     Route::get('deliveries/outstanding-items/{soId}', 'Api\Sales\DeliveryController@getOutstandingItemsForDelivery');
     Route::post('deliveries/from-outstanding', 'Api\Sales\DeliveryController@storeFromOutstanding');
-    
+
     // Routes untuk ItemStock
     Route::get('item-stocks', 'Api\Inventory\ItemStockController@index');
     Route::get('item-stocks/item/{itemId}', 'Api\Inventory\ItemStockController@getItemStock');
@@ -345,7 +345,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('item-stocks/adjust', 'Api\Inventory\ItemStockController@adjustStock');
     Route::post('item-stocks/reserve', 'Api\Inventory\ItemStockController@reserveStock');
     Route::post('item-stocks/release-reservation', 'Api\Inventory\ItemStockController@releaseReservation');
-    
+
     // Routes untuk System Settings
     Route::get('settings', 'Api\Admin\SystemSettingController@index');
     Route::get('settings/group/{group}', 'Api\Admin\SystemSettingController@getByGroup');
@@ -418,10 +418,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('boms/{bomId}/lines', BOMLineController::class);
     // Calculate potential yield from a specific material
     Route::post('/{bomId}/lines/{lineId}/calculate-yield', [BOMLineController::class, 'calculateYield']);
-    
+
     // Calculate maximum possible production based on current stock
     Route::get('/{bomId}/maximum-yield', [BOMLineController::class, 'calculateMaximumYield']);
-    
+
     // Create a yield-based BOM
     Route::post('/yield-based', [BOMController::class, 'createYieldBased']);
 
@@ -457,21 +457,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/material-planning', function (Request $request) {
         // Logika untuk menampilkan material plans dalam bentuk list
         $query = MaterialPlan::query();
-        
+
         if ($request->has('period')) {
             $query->where('planning_period', $request->period);
         }
-        
+
         if ($request->has('material_type')) {
             $query->where('material_type', $request->material_type);
         }
-        
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
-        
+
         $materialPlans = $query->with('item')->orderBy('planning_period', 'desc')->paginate(10);
-        
+
         return response()->json($materialPlans);
     });
 
@@ -545,8 +545,33 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('currency-rates/{id}', [App\Http\Controllers\Api\CurrencyRateController::class, 'show']);
         Route::put('currency-rates/{id}', [App\Http\Controllers\Api\CurrencyRateController::class, 'update']);
         Route::delete('currency-rates/{id}', [App\Http\Controllers\Api\CurrencyRateController::class, 'destroy']);
-        
+
         // Currency Converter utility
         Route::get('currency-rates/current-rate', [App\Http\Controllers\Api\CurrencyRateController::class, 'getCurrentRate']);
+
+        // Sales Invoice Routes
+        Route::group(['prefix' => 'sales/invoices', 'middleware' => ['auth:api']], function () {
+            Route::get('/', [SalesInvoiceController::class, 'index']);
+            Route::post('/from-delivery-orders', [SalesInvoiceController::class, 'createFromDeliveryOrders']);
+            Route::get('/{id}', [SalesInvoiceController::class, 'show']);
+            Route::put('/{id}', [SalesInvoiceController::class, 'update']);
+            Route::delete('/{id}', [SalesInvoiceController::class, 'destroy']);
+            Route::get('/{id}/payment-info', [SalesInvoiceController::class, 'paymentInfo']);
+            Route::post('/{id}/validate', [SalesInvoiceController::class, 'validate']);
+            Route::post('/{id}/cancel', [SalesInvoiceController::class, 'cancel']);
+            Route::post('/get-exchange-rate', [SalesInvoiceController::class, 'getExchangeRate']);
+        });
+
+        Route::prefix('api/sales')->group(function () {
+            // Sales Invoice Routes
+            Route::get('invoices', [SalesInvoiceController::class, 'index']);
+            Route::post('invoices', [SalesInvoiceController::class, 'store']);
+            Route::post('invoices/from-order', [SalesInvoiceController::class, 'createFromOrder']);
+            Route::post('invoices/from-deliveries', [SalesInvoiceController::class, 'createFromDeliveries']);
+            Route::get('invoices/{id}', [SalesInvoiceController::class, 'show']);
+            Route::put('invoices/{id}', [SalesInvoiceController::class, 'update']);
+            Route::delete('invoices/{id}', [SalesInvoiceController::class, 'destroy']);
+            Route::get('invoices/{id}/payment-info', [SalesInvoiceController::class, 'paymentInfo']);
+        });
     });
 });

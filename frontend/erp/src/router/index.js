@@ -441,6 +441,13 @@ const routes = [
                 meta: { requiresAuth: true },
             },
             {
+                path: "/sales/deliveries/outstanding",
+                name: "OutstandingDeliveries",
+                component: () =>
+                    import("../views/sales/OutstandingDeliveryForm.vue"),
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "/sales/deliveries/create",
                 name: "CreateDelivery",
                 component: DeliveryForm,

@@ -7,6 +7,8 @@ use App\Models\Sales\SalesInvoice;
 use App\Models\Sales\SalesInvoiceLine;
 use App\Models\Sales\SalesOrder;
 use App\Models\Sales\SOLine;
+use App\Models\Sales\Delivery;
+use App\Models\Sales\Customer;
 use App\Models\Accounting\CustomerReceivable;
 use App\Models\CurrencyRate;
 use Illuminate\Http\Request;
@@ -55,7 +57,7 @@ class SalesInvoiceController extends Controller
 
             // Get the sales order
             $salesOrder = SalesOrder::find($request->so_id);
-            
+
             // Jika due_date tidak disediakan, hitung otomatis dari payment_term customer
             $dueDate = $request->due_date;
             if (!$dueDate) {
@@ -65,35 +67,35 @@ class SalesInvoiceController extends Controller
             // Determine currency (from request, sales order, or default)
             $currencyCode = $request->currency_code ?? $salesOrder->currency_code ?? config('app.base_currency', 'USD');
             $baseCurrency = config('app.base_currency', 'USD');
-            
+
             // Get exchange rate if invoice currency is different from base currency
             $exchangeRate = 1.0; // Default for base currency
-            
+
             if ($currencyCode !== $baseCurrency) {
                 $rate = CurrencyRate::where('from_currency', $currencyCode)
                     ->where('to_currency', $baseCurrency)
                     ->where('is_active', true)
                     ->where('effective_date', '<=', $request->invoice_date)
-                    ->where(function($query) use ($request) {
+                    ->where(function ($query) use ($request) {
                         $query->where('end_date', '>=', $request->invoice_date)
-                              ->orWhereNull('end_date');
+                            ->orWhereNull('end_date');
                     })
                     ->orderBy('effective_date', 'desc')
                     ->first();
-                    
+
                 if (!$rate) {
                     // Try to find a reverse rate
                     $reverseRate = CurrencyRate::where('from_currency', $baseCurrency)
                         ->where('to_currency', $currencyCode)
                         ->where('is_active', true)
                         ->where('effective_date', '<=', $request->invoice_date)
-                        ->where(function($query) use ($request) {
+                        ->where(function ($query) use ($request) {
                             $query->where('end_date', '>=', $request->invoice_date)
-                                  ->orWhereNull('end_date');
+                                ->orWhereNull('end_date');
                         })
                         ->orderBy('effective_date', 'desc')
                         ->first();
-                        
+
                     if ($reverseRate) {
                         $exchangeRate = 1 / $reverseRate->rate;
                     } else {
@@ -106,7 +108,7 @@ class SalesInvoiceController extends Controller
                     $exchangeRate = $rate->rate;
                 }
             }
-            
+
             $totalAmount = 0;
             $taxAmount = 0;
 
@@ -130,7 +132,7 @@ class SalesInvoiceController extends Controller
             // Create invoice lines
             foreach ($request->lines as $line) {
                 $soLine = SOLine::find($line['so_line_id']);
-                
+
                 // Validate if the invoiced quantity is valid
                 if ($line['quantity'] > $soLine->quantity) {
                     DB::rollBack();
@@ -138,16 +140,16 @@ class SalesInvoiceController extends Controller
                         'message' => 'Invoiced quantity exceeds ordered quantity for item ' . $soLine->item_id
                     ], 400);
                 }
-                
+
                 // Handle currency conversion for line items if needed
                 $unitPrice = $soLine->unit_price;
-                
+
                 // If invoice currency differs from sales order currency
                 if ($currencyCode !== $salesOrder->currency_code) {
                     // Convert from sales order currency to invoice currency via base currency
                     // First get price in base currency
                     $baseUnitPrice = $soLine->base_currency_unit_price;
-                    
+
                     // Then convert to invoice currency
                     if ($currencyCode !== $baseCurrency) {
                         $unitPrice = $baseUnitPrice / $exchangeRate;
@@ -155,20 +157,20 @@ class SalesInvoiceController extends Controller
                         $unitPrice = $baseUnitPrice; // Already in base currency
                     }
                 }
-                
+
                 // Calculate amounts
                 $subtotal = $unitPrice * $line['quantity'];
                 $discount = ($soLine->discount / $soLine->quantity) * $line['quantity'];
                 $tax = ($soLine->tax / $soLine->quantity) * $line['quantity'];
                 $total = $subtotal - $discount + $tax;
-                
+
                 // Calculate base currency amounts
                 $baseUnitPrice = $unitPrice * $exchangeRate;
                 $baseSubtotal = $subtotal * $exchangeRate;
                 $baseDiscount = $discount * $exchangeRate;
                 $baseTax = $tax * $exchangeRate;
                 $baseTotal = $total * $exchangeRate;
-                
+
                 SalesInvoiceLine::create([
                     'invoice_id' => $invoice->invoice_id,
                     'so_line_id' => $line['so_line_id'],
@@ -185,7 +187,7 @@ class SalesInvoiceController extends Controller
                     'base_currency_tax' => $baseTax,
                     'base_currency_total' => $baseTotal
                 ]);
-                
+
                 $totalAmount += $total;
                 $taxAmount += $tax;
             }
@@ -193,7 +195,7 @@ class SalesInvoiceController extends Controller
             // Update invoice totals
             $baseCurrencyTotal = $totalAmount * $exchangeRate;
             $baseCurrencyTax = $taxAmount * $exchangeRate;
-            
+
             $invoice->update([
                 'total_amount' => $totalAmount,
                 'tax_amount' => $taxAmount,
@@ -221,9 +223,9 @@ class SalesInvoiceController extends Controller
             $salesOrder->update(['status' => 'Invoiced']);
 
             DB::commit();
-            
+
             return response()->json([
-                'data' => $invoice->load('salesInvoiceLines'), 
+                'data' => $invoice->load('salesInvoiceLines'),
                 'message' => 'Sales invoice created successfully'
             ], 201);
         } catch (\Exception $e) {
@@ -313,6 +315,265 @@ class SalesInvoiceController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to create sales invoice from order', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Create a sales invoice from multiple delivery orders.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function createFromDeliveries(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'invoice_number' => 'required|unique:SalesInvoice,invoice_number',
+            'invoice_date' => 'required|date',
+            'due_date' => 'nullable|date|after_or_equal:invoice_date',
+            'status' => 'required|string|max:50',
+            'currency_code' => 'nullable|string|size:3',
+            'delivery_ids' => 'required|array',
+            'delivery_ids.*' => 'required|exists:Delivery,delivery_id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Ambil semua delivery yang dipilih
+            $deliveries = Delivery::with(['deliveryLines.salesOrderLine.salesOrder', 'customer'])
+                ->whereIn('delivery_id', $request->delivery_ids)
+                ->get();
+
+            // Validasi semua delivery dari customer yang sama
+            $customerId = null;
+            foreach ($deliveries as $delivery) {
+                if ($customerId === null) {
+                    $customerId = $delivery->customer_id;
+                } elseif ($customerId !== $delivery->customer_id) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'All deliveries must be for the same customer'
+                    ], 400);
+                }
+            }
+
+            // Get customer for payment terms
+            $customer = Customer::find($customerId);
+            if (!$customer) {
+                DB::rollBack();
+                return response()->json(['message' => 'Customer not found'], 404);
+            }
+
+            // Jika due_date tidak disediakan, hitung otomatis dari payment_term customer
+            $dueDate = $request->due_date;
+            if (!$dueDate && isset($customer->payment_term)) {
+                $paymentTerm = $customer->payment_term ?? 30; // default 30 jika tidak diset
+                $dueDate = date('Y-m-d', strtotime($request->invoice_date . ' + ' . $paymentTerm . ' days'));
+            } else if (!$dueDate) {
+                // Default 30 days if no payment term set
+                $dueDate = date('Y-m-d', strtotime($request->invoice_date . ' + 30 days'));
+            }
+
+            // Determine currency
+            $currencyCode = $request->currency_code ?? $customer->preferred_currency ?? config('app.base_currency', 'USD');
+            $baseCurrency = config('app.base_currency', 'USD');
+
+            // Get exchange rate if needed
+            $exchangeRate = 1.0; // Default for base currency
+            if ($currencyCode !== $baseCurrency) {
+                $rate = CurrencyRate::where('from_currency', $currencyCode)
+                    ->where('to_currency', $baseCurrency)
+                    ->where('is_active', true)
+                    ->where('effective_date', '<=', $request->invoice_date)
+                    ->where(function ($query) use ($request) {
+                        $query->where('end_date', '>=', $request->invoice_date)
+                            ->orWhereNull('end_date');
+                    })
+                    ->orderBy('effective_date', 'desc')
+                    ->first();
+
+                if (!$rate) {
+                    // Try to find a reverse rate
+                    $reverseRate = CurrencyRate::where('from_currency', $baseCurrency)
+                        ->where('to_currency', $currencyCode)
+                        ->where('is_active', true)
+                        ->where('effective_date', '<=', $request->invoice_date)
+                        ->where(function ($query) use ($request) {
+                            $query->where('end_date', '>=', $request->invoice_date)
+                                ->orWhereNull('end_date');
+                        })
+                        ->orderBy('effective_date', 'desc')
+                        ->first();
+
+                    if ($reverseRate) {
+                        $exchangeRate = 1 / $reverseRate->rate;
+                    } else {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => 'No exchange rate found for the specified currency on the invoice date'
+                        ], 422);
+                    }
+                } else {
+                    $exchangeRate = $rate->rate;
+                }
+            }
+
+            // Create invoice
+            $invoice = SalesInvoice::create([
+                'invoice_number' => $request->invoice_number,
+                'invoice_date' => $request->invoice_date,
+                'customer_id' => $customerId,
+                'due_date' => $dueDate,
+                'status' => $request->status,
+                'currency_code' => $currencyCode,
+                'exchange_rate' => $exchangeRate,
+                'base_currency' => $baseCurrency,
+                'total_amount' => 0, // Will update later
+                'tax_amount' => 0,   // Will update later
+                'base_currency_total' => 0,
+                'base_currency_tax' => 0
+            ]);
+
+            $totalAmount = 0;
+            $taxAmount = 0;
+            $processedSoIds = []; // Track which SO IDs have been processed
+
+            // Process each delivery
+            foreach ($deliveries as $delivery) {
+                // Add SO ID to processed list if not already there
+                if ($delivery->so_id && !in_array($delivery->so_id, $processedSoIds)) {
+                    $processedSoIds[] = $delivery->so_id;
+                }
+
+                // Process each delivery line
+                foreach ($delivery->deliveryLines as $deliveryLine) {
+                    // Get related SO line to get pricing information
+                    $soLine = $deliveryLine->salesOrderLine;
+
+                    if (!$soLine) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => 'Cannot find sales order line for delivery line with item ' . $deliveryLine->item_id
+                        ], 400);
+                    }
+
+                    // Handle currency conversion if needed
+                    $unitPrice = $soLine->unit_price;
+
+                    // If invoice currency differs from SO currency
+                    if ($currencyCode !== $soLine->salesOrder->currency_code) {
+                        // Calculate based on base currency price if available
+                        if (isset($soLine->base_currency_unit_price) && $currencyCode === $baseCurrency) {
+                            $unitPrice = $soLine->base_currency_unit_price;
+                        } else {
+                            // Convert from SO currency to invoice currency
+                            $soExchangeRate = $soLine->salesOrder->exchange_rate;
+                            $baseUnitPrice = $unitPrice * $soExchangeRate;
+                            $unitPrice = $baseUnitPrice / $exchangeRate;
+                        }
+                    }
+
+                    // Calculate line amounts
+                    $quantity = $deliveryLine->delivered_quantity;
+                    $subtotal = $unitPrice * $quantity;
+
+                    // Calculate proportionate discount and tax based on ratios from SO line
+                    $discountRatio = $soLine->subtotal > 0 ? $soLine->discount / $soLine->subtotal : 0;
+                    $taxRatio = $soLine->subtotal > 0 ? $soLine->tax / $soLine->subtotal : 0;
+
+                    $discount = $subtotal * $discountRatio;
+                    $tax = $subtotal * $taxRatio;
+                    $total = $subtotal - $discount + $tax;
+
+                    // Calculate base currency values
+                    $baseUnitPrice = $unitPrice * $exchangeRate;
+                    $baseSubtotal = $subtotal * $exchangeRate;
+                    $baseDiscount = $discount * $exchangeRate;
+                    $baseTax = $tax * $exchangeRate;
+                    $baseTotal = $total * $exchangeRate;
+
+                    // Create invoice line
+                    SalesInvoiceLine::create([
+                        'invoice_id' => $invoice->invoice_id,
+                        'so_line_id' => $soLine->line_id,
+                        'item_id' => $deliveryLine->item_id,
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'discount' => $discount,
+                        'subtotal' => $subtotal,
+                        'tax' => $tax,
+                        'total' => $total,
+                        'base_currency_unit_price' => $baseUnitPrice,
+                        'base_currency_subtotal' => $baseSubtotal,
+                        'base_currency_discount' => $baseDiscount,
+                        'base_currency_tax' => $baseTax,
+                        'base_currency_total' => $baseTotal
+                    ]);
+
+                    $totalAmount += $total;
+                    $taxAmount += $tax;
+                }
+
+                // Update delivery status if needed
+                $delivery->update(['status' => 'Invoiced']);
+            }
+
+            // Update invoice totals
+            $baseCurrencyTotal = $totalAmount * $exchangeRate;
+            $baseCurrencyTax = $taxAmount * $exchangeRate;
+
+            $invoice->update([
+                'total_amount' => $totalAmount,
+                'tax_amount' => $taxAmount,
+                'base_currency_total' => $baseCurrencyTotal,
+                'base_currency_tax' => $baseCurrencyTax
+            ]);
+
+            // Update invoice with reference to first SO if available
+            if (!empty($processedSoIds)) {
+                $invoice->update(['so_id' => $processedSoIds[0]]);
+            }
+
+            // Create customer receivable
+            CustomerReceivable::create([
+                'customer_id' => $customerId,
+                'invoice_id' => $invoice->invoice_id,
+                'amount' => $totalAmount,
+                'due_date' => $dueDate,
+                'paid_amount' => 0,
+                'balance' => $totalAmount,
+                'status' => 'Open',
+                'currency_code' => $currencyCode,
+                'exchange_rate' => $exchangeRate,
+                'base_currency' => $baseCurrency,
+                'base_currency_amount' => $baseCurrencyTotal,
+                'base_currency_balance' => $baseCurrencyTotal
+            ]);
+
+            // Update SO status for all processed SOs if needed
+            foreach ($processedSoIds as $soId) {
+                $salesOrder = SalesOrder::find($soId);
+                if ($salesOrder && $salesOrder->status !== 'Invoiced') {
+                    $salesOrder->update(['status' => 'Invoiced']);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'data' => $invoice->load('salesInvoiceLines'),
+                'message' => 'Sales invoice created from delivery orders successfully'
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to create sales invoice from delivery orders',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 

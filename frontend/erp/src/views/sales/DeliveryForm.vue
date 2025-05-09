@@ -148,6 +148,7 @@
                 <div class="line-header">Jumlah Dikirim</div>
                 <div class="line-header">Gudang</div>
                 <div class="line-header">Batch Number</div>
+                <div class="line-header">Aksi</div>
               </div>
 
               <div
@@ -157,8 +158,8 @@
               >
                 <div class="line-item">
                   <div class="item-info" v-if="line.item">
-                    <div class="item-code">{{ line.item.item_code }}</div>
-                    <div class="item-name">{{ line.item.name }}</div>
+                  <div class="item-code">{{ line.item.itemCode }}</div>
+                  <div class="item-name">{{ line.item.name }}</div>
                   </div>
                   <div v-else>-</div>
                 </div>
@@ -193,6 +194,17 @@
                     v-model="line.batch_number"
                     placeholder="Batch Number (opsional)"
                   />
+                </div>
+
+                <div class="line-item actions">
+                  <button
+                    type="button"
+                    class="btn-icon delete-btn"
+                    title="Hapus Item"
+                    @click="removeLine(index)"
+                  >
+                    <i class="fas fa-trash"></i>
+                  </button>
                 </div>
               </div>
             </div>
@@ -291,18 +303,21 @@
 
         try {
           const response = await axios.get(`/deliveries/${route.params.id}`);
-          const delivery = response.data.data;
+          let delivery = response.data.data;
+
+          // Convert delivery object to camelCase
+          delivery = toCamelCase(delivery);
 
           // Set form data
           form.value = {
-            delivery_id: delivery.delivery_id,
-            delivery_number: delivery.delivery_number,
-            delivery_date: delivery.delivery_date.substr(0, 10),
-            so_id: delivery.so_id,
-            customer_id: delivery.customer_id,
+            delivery_id: delivery.deliveryId,
+            delivery_number: delivery.deliveryNumber,
+            delivery_date: delivery.deliveryDate.substr(0, 10),
+            so_id: delivery.soId,
+            customer_id: delivery.customerId,
             status: delivery.status,
-            shipping_method: delivery.shipping_method || '',
-            tracking_number: delivery.tracking_number || '',
+            shipping_method: delivery.shippingMethod || '',
+            tracking_number: delivery.trackingNumber || '',
             lines: []
           };
 
@@ -311,19 +326,42 @@
 
           // Set line items
           if (delivery.deliveryLines && delivery.deliveryLines.length > 0) {
-            form.value.lines = delivery.deliveryLines.map(line => ({
-              line_id: line.line_id,
-              so_line_id: line.so_line_id,
-              item_id: line.item_id,
+            console.log('Raw deliveryLines:', delivery.deliveryLines);
+            const camelDeliveryLines = toCamelCase(delivery.deliveryLines);
+            console.log('CamelCase deliveryLines:', camelDeliveryLines);
+            form.value.lines = camelDeliveryLines.map(line => ({
+              line_id: line.lineId,
+              so_line_id: line.soLineId,
+              item_id: line.itemId,
               item: line.item,
-              delivered_quantity: line.delivered_quantity,
-              warehouse_id: line.warehouse_id,
-              batch_number: line.batch_number || ''
+              delivered_quantity: line.deliveredQuantity,
+              warehouse_id: line.warehouseId,
+              batch_number: line.batchNumber || ''
             }));
+            console.log('Mapped form lines:', form.value.lines);
+
+            // Fetch item details for lines missing item info
+            await Promise.all(form.value.lines.map(async (line) => {
+              if (!line.item) {
+                try {
+                  const response = await axios.get(`/items/${line.item_id}`);
+                  line.item = toCamelCase(response.data.data);
+                  console.log(`Fetched item for item_id ${line.item_id}:`, line.item);
+                } catch (err) {
+                  console.error(`Error loading item details for item_id ${line.item_id}:`, err);
+                }
+              }
+            }));
+            console.log('Final form lines after fetching items:', form.value.lines);
           }
 
           // Load sales order details to get item information
-          await loadSalesOrderDetails();
+          if (!isEditMode.value) {
+            await loadSalesOrderDetails();
+          } else {
+            console.log('Edit mode: skipping loadSalesOrderDetails to avoid overwriting lines');
+            console.log('Current form lines:', form.value.lines);
+          }
         } catch (err) {
           console.error('Error loading delivery:', err);
           error.value = 'Terjadi kesalahan saat memuat data pengiriman.';
@@ -395,6 +433,13 @@
         return line.available_quantity || 0;
       };
 
+      // Remove a line
+      const removeLine = (index) => {
+        if (confirm('Apakah Anda yakin ingin menghapus item ini?')) {
+          form.value.lines.splice(index, 1);
+        }
+      };
+
       // Go back to the previous page
       const goBack = () => {
         router.push('/sales/deliveries');
@@ -405,6 +450,12 @@
         // Validate form
         if (!form.value.delivery_number || !form.value.delivery_date || !form.value.so_id) {
           error.value = 'Harap isi semua field yang wajib diisi.';
+          return;
+        }
+
+        // Validate line items
+        if (form.value.lines.length === 0) {
+          error.value = 'Pengiriman harus memiliki setidaknya satu item.';
           return;
         }
 
@@ -469,6 +520,7 @@
         error,
         isEditMode,
         getAvailableQuantity,
+        removeLine,
         loadSalesOrderDetails,
         goBack,
         saveDelivery
@@ -641,7 +693,7 @@
 
   .line-headers {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 0.5fr;
     gap: 0.5rem;
     background-color: #f8fafc;
     padding: 0.75rem 1rem;
@@ -656,7 +708,7 @@
 
   .delivery-line {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 0.5fr;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #e2e8f0;
@@ -733,6 +785,37 @@
     background-color: #cbd5e1;
   }
 
+  .btn-icon {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    padding: 0.375rem;
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .btn-icon:hover {
+    background-color: #f1f5f9;
+  }
+
+  .delete-btn {
+    color: #64748b;
+  }
+
+  .delete-btn:hover {
+    color: #dc2626;
+    background-color: #fee2e2;
+  }
+
+  .line-item.actions {
+    display: flex;
+    justify-content: center;
+  }
+
   @media (max-width: 1024px) {
     .form-row {
       grid-template-columns: 1fr;
@@ -741,7 +824,7 @@
 
     .delivery-line,
     .line-headers {
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       font-size: 0.75rem;
       padding: 0.5rem;
     }
@@ -778,6 +861,18 @@
 
     .line-item::before {
       content: attr(data-label);
+      font-weight: 500;
+      width: 8rem;
+      text-align: left;
+    }
+
+    .line-item.actions {
+      justify-content: flex-start;
+      margin-top: 0.5rem;
+    }
+
+    .line-item.actions::before {
+      content: "Aksi";
       font-weight: 500;
       width: 8rem;
       text-align: left;

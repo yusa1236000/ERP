@@ -15,7 +15,7 @@ class SalesInvoiceLine extends Model
     protected $table = 'SalesInvoiceLine';
     protected $primaryKey = 'line_id';
     public $timestamps = false;
-    
+
     protected $fillable = [
         'invoice_id',
         'so_line_id',
@@ -32,7 +32,7 @@ class SalesInvoiceLine extends Model
         'base_currency_tax', // Baru
         'base_currency_total' // Baru
     ];
-    
+
     protected $casts = [
         'quantity' => 'float',
         'unit_price' => 'float',
@@ -78,7 +78,7 @@ class SalesInvoiceLine extends Model
     {
         return $this->hasMany(SalesReturnLine::class, 'invoice_line_id');
     }
-    
+
     /**
      * Get line amounts in specified currency.
      *
@@ -90,7 +90,7 @@ class SalesInvoiceLine extends Model
     {
         $invoice = $this->salesInvoice;
         $date = $date ?? $invoice->invoice_date;
-        
+
         // If already in requested currency, return original amounts
         if ($invoice->currency_code === $toCurrency) {
             return [
@@ -101,7 +101,7 @@ class SalesInvoiceLine extends Model
                 'total' => $this->total
             ];
         }
-        
+
         // Try to convert via base currency first
         if ($toCurrency === $invoice->base_currency) {
             return [
@@ -112,10 +112,10 @@ class SalesInvoiceLine extends Model
                 'total' => $this->base_currency_total
             ];
         }
-        
+
         // Get rate from base currency to requested currency
         $rate = CurrencyRate::getCurrentRate($invoice->base_currency, $toCurrency, $date);
-        
+
         if (!$rate) {
             // Try direct conversion
             $rate = CurrencyRate::getCurrentRate($invoice->currency_code, $toCurrency, $date);
@@ -129,7 +129,7 @@ class SalesInvoiceLine extends Model
                     'total' => $this->total
                 ];
             }
-            
+
             return [
                 'unit_price' => $this->unit_price * $rate,
                 'subtotal' => $this->subtotal * $rate,
@@ -138,7 +138,7 @@ class SalesInvoiceLine extends Model
                 'total' => $this->total * $rate
             ];
         }
-        
+
         return [
             'unit_price' => $this->base_currency_unit_price * $rate,
             'subtotal' => $this->base_currency_subtotal * $rate,

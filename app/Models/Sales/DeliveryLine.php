@@ -15,7 +15,7 @@ class DeliveryLine extends Model
     protected $table = 'DeliveryLine';
     protected $primaryKey = 'line_id';
     public $timestamps = false;
-    
+
     protected $fillable = [
         'delivery_id',
         'so_line_id',
