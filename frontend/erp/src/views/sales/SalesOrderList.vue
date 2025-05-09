@@ -18,7 +18,7 @@
                             <option value="Confirmed">Dikonfirmasi</option>
                             <option value="Processing">Diproses</option>
                             <option value="Shipped">Dikirim</option>
-                            <option value="Delivered">Terkirim</option>
+                            <option value="Delivering">Terkirim</option>
                             <option value="Invoiced">Difakturkan</option>
                             <option value="Closed">Selesai</option>
                         </select>
@@ -258,11 +258,14 @@ export default {
                 // Prepare query parameters
                 const params = {
                     page: currentPage.value,
-                    status: statusFilter.value,
                     search: searchQuery.value,
                     sort_field: sortKey.value,
                     sort_direction: sortOrder.value,
                 };
+
+                if (statusFilter.value !== "") {
+                    params.status = statusFilter.value;
+                }
 
                 // Add date range filters if applicable
                 if (dateRangeFilter.value === "custom") {

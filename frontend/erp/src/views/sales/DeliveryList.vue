@@ -203,7 +203,7 @@
       // Search and filtering
       const searchQuery = ref('');
       const statusFilter = ref('');
-      const dateRangeFilter = ref('month');
+      const dateRangeFilter = ref('all');
       const customDateRange = ref({
         startDate: new Date().toISOString().substr(0, 10),
         endDate: new Date().toISOString().substr(0, 10)

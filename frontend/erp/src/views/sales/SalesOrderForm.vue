@@ -331,19 +331,7 @@
                 </div>
             </div>
 
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" @click="goBack">
-                    Batal
-                </button>
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    @click="saveOrder"
-                    :disabled="isSubmitting"
-                >
-                    {{ isSubmitting ? "Menyimpan..." : "Simpan Order" }}
-                </button>
-            </div>
+
         </div>
     </div>
 </template>

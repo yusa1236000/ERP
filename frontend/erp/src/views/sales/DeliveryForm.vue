@@ -210,15 +210,6 @@
             </div>
           </div>
         </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" @click="goBack">
-            Batal
-          </button>
-          <button type="button" class="btn btn-primary" @click="saveDelivery" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Menyimpan...' : 'Simpan Pengiriman' }}
-          </button>
-        </div>
       </div>
     </div>
   </template>
