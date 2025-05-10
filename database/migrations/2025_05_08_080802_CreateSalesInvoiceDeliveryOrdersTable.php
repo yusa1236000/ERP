@@ -18,7 +18,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('invoice_id')->references('invoice_id')->on('SalesInvoice')->onDelete('cascade');
-            $table->foreign('do_id')->references('do_id')->on('DeliveryOrder')->onDelete('cascade');
+            $table->foreign('do_id')->references('delivery_id')->on('Delivery')->onDelete('cascade');
 
             $table->unique(['invoice_id', 'do_id']);
         });

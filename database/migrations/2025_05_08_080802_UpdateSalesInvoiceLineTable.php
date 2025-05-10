@@ -21,7 +21,7 @@ return new class extends Migration
             }
 
             // Add foreign key constraint
-            $table->foreign('do_line_id')->references('line_id')->on('DOLine')->onDelete('set null');
+            $table->foreign('do_line_id')->references('line_id')->on('DeliveryLine')->onDelete('set null');
         });
     }
 

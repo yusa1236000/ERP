@@ -95,6 +95,16 @@
                             <td>:</td>
                             <td>{{ invoice.payment_terms }}</td>
                         </tr>
+                        <tr>
+                            <td>Currency</td>
+                            <td>:</td>
+                            <td>{{ invoice.currency_code || "IDR" }}</td>
+                        </tr>
+                        <tr v-if="invoice.exchange_rate && invoice.currency_code !== invoice.base_currency">
+                            <td>Exchange Rate</td>
+                            <td>:</td>
+                            <td>{{ invoice.exchange_rate }} ({{ invoice.currency_code }} to {{ invoice.base_currency }})</td>
+                        </tr>
                     </table>
                 </div>
             </div>
@@ -136,17 +146,17 @@
                                 {{ getUomSymbol(line.uom_id) }}
                             </td>
                             <td class="right">
-                                {{ formatCurrency(line.unit_price) }}
+                                {{ formatCurrency(line.unit_price, invoice.currency_code) }}
                             </td>
                             <td class="right">
                                 {{
                                     line.discount
-                                        ? formatCurrency(line.discount)
+                                        ? formatCurrency(line.discount, invoice.currency_code)
                                         : "-"
                                 }}
                             </td>
                             <td class="right">
-                                {{ formatCurrency(line.total) }}
+                                {{ formatCurrency(line.total, invoice.currency_code) }}
                             </td>
                         </tr>
                     </tbody>
@@ -155,33 +165,66 @@
                             <td colspan="5" rowspan="3"></td>
                             <td class="right">Subtotal:</td>
                             <td class="right">
-                                {{ formatCurrency(calculateSubtotal()) }}
+                                {{ formatCurrency(calculateSubtotal(), invoice.currency_code) }}
                             </td>
                         </tr>
                         <tr>
                             <td class="right">Tax:</td>
                             <td class="right">
-                                {{ formatCurrency(calculateTotalTax()) }}
+                                {{ formatCurrency(calculateTotalTax(), invoice.currency_code) }}
                             </td>
                         </tr>
                         <tr class="grand-total">
                             <td class="right">Total:</td>
                             <td class="right">
-                                {{ formatCurrency(invoice.total_amount) }}
+                                {{ formatCurrency(invoice.total_amount, invoice.currency_code) }}
+                            </td>
+                        </tr>
+                        <tr v-if="invoice.currency_code !== invoice.base_currency">
+                            <td colspan="5" rowspan="3"></td>
+                            <td class="right">Subtotal ({{ invoice.base_currency }}):</td>
+                            <td class="right">
+                                {{ formatCurrency(getAmountInBaseCurrency(calculateSubtotal()), invoice.base_currency) }}
+                            </td>
+                        </tr>
+                        <tr v-if="invoice.currency_code !== invoice.base_currency">
+                            <td class="right">Tax ({{ invoice.base_currency }}):</td>
+                            <td class="right">
+                                {{ formatCurrency(getAmountInBaseCurrency(calculateTotalTax()), invoice.base_currency) }}
+                            </td>
+                        </tr>
+                        <tr v-if="invoice.currency_code !== invoice.base_currency" class="base-currency-total">
+                            <td class="right">Total ({{ invoice.base_currency }}):</td>
+                            <td class="right">
+                                {{ formatCurrency(invoice.base_currency_total || getAmountInBaseCurrency(invoice.total_amount), invoice.base_currency) }}
                             </td>
                         </tr>
                         <tr v-if="invoice.paid_amount > 0">
                             <td colspan="5"></td>
                             <td class="right">Paid:</td>
                             <td class="right">
-                                {{ formatCurrency(invoice.paid_amount) }}
+                                {{ formatCurrency(invoice.paid_amount, invoice.currency_code) }}
+                            </td>
+                        </tr>
+                        <tr v-if="invoice.paid_amount > 0 && invoice.currency_code !== invoice.base_currency">
+                            <td colspan="5"></td>
+                            <td class="right">Paid ({{ invoice.base_currency }}):</td>
+                            <td class="right">
+                                {{ formatCurrency(getAmountInBaseCurrency(invoice.paid_amount), invoice.base_currency) }}
                             </td>
                         </tr>
                         <tr v-if="invoice.paid_amount > 0" class="balance-due">
                             <td colspan="5"></td>
                             <td class="right">Balance Due:</td>
                             <td class="right">
-                                {{ formatCurrency(calculateBalanceDue()) }}
+                                {{ formatCurrency(calculateBalanceDue(), invoice.currency_code) }}
+                            </td>
+                        </tr>
+                        <tr v-if="invoice.paid_amount > 0 && invoice.currency_code !== invoice.base_currency" class="balance-due">
+                            <td colspan="5"></td>
+                            <td class="right">Balance Due ({{ invoice.base_currency }}):</td>
+                            <td class="right">
+                                {{ formatCurrency(getAmountInBaseCurrency(calculateBalanceDue()), invoice.base_currency) }}
                             </td>
                         </tr>
                     </tfoot>
@@ -264,7 +307,7 @@ export default {
                 // Load invoice details
                 const invoiceResponse =
                     await SalesInvoiceService.getInvoiceById(route.params.id);
-                invoice.value = invoiceResponse.data;
+                invoice.value = invoiceResponse.data.data;
             } catch (error) {
                 console.error("Error loading invoice:", error);
                 invoice.value = null;
@@ -290,10 +333,11 @@ export default {
         };
 
         // Format currency
-        const formatCurrency = (value) => {
+        const formatCurrency = (value, currencyCode) => {
+            const code = currencyCode || (invoice.value ? invoice.value.currency_code : "IDR");
             return new Intl.NumberFormat("id-ID", {
                 style: "currency",
-                currency: "IDR",
+                currency: code,
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
             }).format(value || 0);
@@ -303,6 +347,16 @@ export default {
         const getUomSymbol = (uomId) => {
             const uom = unitOfMeasures.value.find((u) => u.uom_id === uomId);
             return uom ? uom.symbol : "-";
+        };
+
+        // Helper method to convert amounts to base currency
+        const getAmountInBaseCurrency = (amount) => {
+            if (!invoice.value || !invoice.value.exchange_rate ||
+                !invoice.value.currency_code || !invoice.value.base_currency ||
+                invoice.value.currency_code === invoice.value.base_currency) {
+                return amount;
+            }
+            return amount * invoice.value.exchange_rate;
         };
 
         // Calculate subtotal of all lines
@@ -369,6 +423,7 @@ export default {
             formatNumber,
             formatCurrency,
             getUomSymbol,
+            getAmountInBaseCurrency,
             calculateSubtotal,
             calculateTotalTax,
             calculateBalanceDue,
@@ -624,6 +679,12 @@ export default {
     background-color: #dbeafe;
     color: #1e40af;
     font-size: 14px;
+}
+
+.base-currency-total td {
+    background-color: #f1f5f9;
+    color: #475569;
+    font-size: 12px;
 }
 
 .balance-due td {

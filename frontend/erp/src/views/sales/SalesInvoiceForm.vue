@@ -1,1384 +1,845 @@
-<!-- Template section of SalesInvoiceForm.vue -->
+<!-- src/views/sales/SalesInvoiceForm.vue -->
 <template>
-    <div class="invoice-form">
-        <div class="page-header">
-            <h1>{{ isEditMode ? "Edit Invoice" : "Create New Invoice" }}</h1>
-            <div class="page-actions">
-                <button class="btn btn-secondary" @click="goBack">
-                    <i class="fas fa-arrow-left"></i> Back
-                </button>
-                <button
-                    class="btn btn-primary"
-                    @click="saveInvoice"
-                    :disabled="isSubmitting"
-                >
-                    <i class="fas fa-save"></i>
-                    {{ isSubmitting ? "Saving..." : "Save" }}
-                </button>
-            </div>
-        </div>
-
-        <div v-if="error" class="alert alert-danger">
-            {{ error }}
-        </div>
-
-        <div class="form-container">
-            <div class="form-card">
-                <div class="card-header">
-                    <h2>Invoice Information</h2>
-                </div>
-                <div class="card-body">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="invoice_number">Invoice Number*</label>
-                            <input
-                                type="text"
-                                id="invoice_number"
-                                v-model="form.invoice_number"
-                                required
-                                :readonly="isEditMode"
-                                :class="{ readonly: isEditMode }"
-                            />
-                            <small v-if="isEditMode" class="text-muted"
-                                >Invoice number cannot be changed</small
-                            >
-                        </div>
-
-                        <div class="form-group">
-                            <label for="invoice_date">Invoice Date*</label>
-                            <input
-                                type="date"
-                                id="invoice_date"
-                                v-model="form.invoice_date"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="customer_id">Customer*</label>
-                            <select
-                                id="customer_id"
-                                v-model="form.customer_id"
-                                required
-                                @change="loadCustomerData"
-                            >
-                                <option value="">-- Select Customer --</option>
-                                <option
-                                    v-for="customer in customers"
-                                    :key="customer.customer_id"
-                                    :value="customer.customer_id"
-                                >
-                                    {{ customer.name }}
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="due_date">Due Date*</label>
-                            <input
-                                type="date"
-                                id="due_date"
-                                v-model="form.due_date"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="so_id">Sales Order (Optional)</label>
-                            <select
-                                id="so_id"
-                                v-model="form.so_id"
-                                @change="loadOrderData"
-                            >
-                                <option value="">-- Select Order --</option>
-                                <option
-                                    v-for="order in salesOrders"
-                                    :key="order.so_id"
-                                    :value="order.so_id"
-                                >
-                                    {{ order.so_number }}
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="reference">Reference</label>
-                            <input
-                                type="text"
-                                id="reference"
-                                v-model="form.reference"
-                                placeholder="Invoice reference number"
-                            />
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="payment_terms">Payment Terms</label>
-                            <input
-                                type="text"
-                                id="payment_terms"
-                                v-model="form.payment_terms"
-                                placeholder="Payment terms"
-                            />
-                        </div>
-
-                        <div class="form-group">
-                            <label for="currency_code">Currency*</label>
-                            <select id="currency_code" v-model="form.currency_code" required>
-                                <option v-for="currency in currencies" :key="currency" :value="currency">
-                                    {{ currency }}
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row" v-if="isEditMode">
-                        <div class="form-group">
-                            <label for="status">Status*</label>
-                            <select id="status" v-model="form.status" required>
-                                <option value="Draft">Draft</option>
-                                <option value="Sent">Sent</option>
-                                <option value="Paid">Paid</option>
-                                <option value="Partially Paid">
-                                    Partially Paid
-                                </option>
-                                <option value="Overdue">Overdue</option>
-                                <option value="Cancelled">Cancelled</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group" v-if="form.exchange_rate">
-                            <label>Exchange Rate</label>
-                            <div class="exchange-rate-display">
-                                <span>{{ form.exchange_rate }}</span>
-                                <span class="text-muted">({{ form.currency_code }} to {{ form.base_currency }})</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-card">
-                <div class="card-header">
-                    <h2>Invoice Items</h2>
-                    <button
-                        type="button"
-                        class="btn btn-sm btn-primary"
-                        @click="addLine"
-                    >
-                        <i class="fas fa-plus"></i> Add Item
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div v-if="form.lines.length === 0" class="empty-lines">
-                        <p>
-                            No items have been added yet. Click "Add Item" to
-                            add invoice items.
-                        </p>
-                    </div>
-
-                    <div v-else class="invoice-lines">
-                        <div class="line-headers">
-                            <div class="line-header">Item</div>
-                            <div class="line-header">Unit Price ({{ form.currency_code || 'Default' }})</div>
-                            <div class="line-header">Quantity</div>
-                            <div class="line-header">UOM</div>
-                            <div class="line-header">Discount</div>
-                            <div class="line-header">Tax</div>
-                            <div class="line-header">Subtotal</div>
-                            <div class="line-header">Total</div>
-                            <div class="line-header"></div>
-                        </div>
-
-                        <div
-                            v-for="(line, index) in form.lines"
-                            :key="index"
-                            class="invoice-line"
-                        >
-                            <div class="line-item">
-                                <select
-                                    v-model="line.item_id"
-                                    required
-                                    @change="updateItemInfo(index)"
-                                >
-                                    <option value="">-- Select Item --</option>
-                                    <option
-                                        v-for="item in items"
-                                        :key="item.item_id"
-                                        :value="item.item_id"
-                                    >
-                                        {{ item.item_code }} - {{ item.name }}
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div class="line-item">
-                                <input
-                                    type="number"
-                                    v-model="line.unit_price"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                    @input="calculateLineTotals(index)"
-                                />
-                            </div>
-
-                            <div class="line-item">
-                                <input
-                                    type="number"
-                                    v-model="line.quantity"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                    @input="calculateLineTotals(index)"
-                                />
-                            </div>
-
-                            <div class="line-item">
-                                <select v-model="line.uom_id" required>
-                                    <option value="">-- UOM --</option>
-                                    <option
-                                        v-for="uom in unitOfMeasures"
-                                        :key="uom.uom_id"
-                                        :value="uom.uom_id"
-                                    >
-                                        {{ uom.symbol }}
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div class="line-item">
-                                <input
-                                    type="number"
-                                    v-model="line.discount"
-                                    min="0"
-                                    step="0.01"
-                                    @input="calculateLineTotals(index)"
-                                />
-                            </div>
-
-                            <div class="line-item">
-                                <input
-                                    type="number"
-                                    v-model="line.tax"
-                                    min="0"
-                                    step="0.01"
-                                    @input="calculateLineTotals(index)"
-                                />
-                            </div>
-
-                            <div class="line-item subtotal">
-                                {{ formatCurrency(line.subtotal, form.currency_code) }}
-                            </div>
-
-                            <div class="line-item total">
-                                {{ formatCurrency(line.total, form.currency_code) }}
-                            </div>
-
-                            <div class="line-item actions">
-                                <button
-                                    type="button"
-                                    class="btn-icon delete"
-                                    title="Remove Item"
-                                    @click="removeLine(index)"
-                                >
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="invoice-totals">
-                            <div class="total-row">
-                                <div class="total-label">Subtotal:</div>
-                                <div class="total-value">
-                                    {{ formatCurrency(calculateSubtotal(), form.currency_code) }}
-                                </div>
-                            </div>
-                            <div class="total-row">
-                                <div class="total-label">Total Discount:</div>
-                                <div class="total-value">
-                                    {{
-                                        formatCurrency(calculateTotalDiscount(), form.currency_code)
-                                    }}
-                                </div>
-                            </div>
-                            <div class="total-row">
-                                <div class="total-label">Total Tax:</div>
-                                <div class="total-value">
-                                    {{ formatCurrency(calculateTotalTax(), form.currency_code) }}
-                                </div>
-                            </div>
-                            <div class="total-row grand-total">
-                                <div class="total-label">Total:</div>
-                                <div class="total-value">
-                                    {{ formatCurrency(calculateGrandTotal(), form.currency_code) }}
-                                </div>
-                            </div>
-                            <div class="total-row base-currency" v-if="form.currency_code && form.currency_code !== baseCurrency">
-                                <div class="total-label">Total ({{ baseCurrency }}):</div>
-                                <div class="total-value">
-                                    {{ formatCurrency(calculateGrandTotal() * (form.exchange_rate || 1), baseCurrency) }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" @click="goBack">
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    @click="saveInvoice"
-                    :disabled="isSubmitting"
-                >
-                    {{ isSubmitting ? "Saving..." : "Save Invoice" }}
-                </button>
-            </div>
-        </div>
+  <div class="page-content">
+    <div class="page-header">
+      <button class="btn btn-secondary" @click="goBack">
+        <i class="fas fa-arrow-left"></i> Kembali
+      </button>
+      <h1 class="page-title">{{ isEditMode ? 'Edit Invoice' : 'Buat Invoice Baru' }}</h1>
     </div>
+
+    <div v-if="isLoading" class="loading-container">
+      <div class="loading-indicator">
+        <i class="fas fa-spinner fa-spin"></i>
+        <span>Memuat data...</span>
+      </div>
+    </div>
+
+    <div v-else-if="error" class="error-container">
+      <div class="error-message">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>{{ error }}</span>
+      </div>
+      <button class="btn btn-primary" @click="retry">Coba Lagi</button>
+    </div>
+
+    <div v-else class="invoice-form-container">
+      <form @submit.prevent="saveInvoice" class="invoice-form">
+        <!-- Invoice Header Card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Informasi Invoice</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="invoice_number">Nomor Invoice <span class="required">*</span></label>
+                <input
+                  type="text"
+                  id="invoice_number"
+                  v-model="form.invoice_number"
+                  class="form-control"
+                  :class="{ 'is-invalid': validationErrors.invoice_number }"
+                  required
+                  :disabled="isEditMode"
+                />
+                <div v-if="validationErrors.invoice_number" class="invalid-feedback">
+                  {{ validationErrors.invoice_number[0] }}
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="invoice_date">Tanggal Invoice <span class="required">*</span></label>
+                <input
+                  type="date"
+                  id="invoice_date"
+                  v-model="form.invoice_date"
+                  class="form-control"
+                  :class="{ 'is-invalid': validationErrors.invoice_date }"
+                  required
+                />
+                <div v-if="validationErrors.invoice_date" class="invalid-feedback">
+                  {{ validationErrors.invoice_date[0] }}
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="due_date">Tanggal Jatuh Tempo <span class="required">*</span></label>
+                <input
+                  type="date"
+                  id="due_date"
+                  v-model="form.due_date"
+                  class="form-control"
+                  :class="{ 'is-invalid': validationErrors.due_date }"
+                  required
+                />
+                <div v-if="validationErrors.due_date" class="invalid-feedback">
+                  {{ validationErrors.due_date[0] }}
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="so_id">Sales Order <span class="required">*</span></label>
+                <select
+                  id="so_id"
+                  v-model="form.so_id"
+                  class="form-control"
+                  :class="{ 'is-invalid': validationErrors.so_id }"
+                  required
+                  :disabled="isEditMode"
+                  @change="loadSalesOrder"
+                >
+                  <option value="" disabled selected>Pilih Sales Order</option>
+                  <option v-for="order in salesOrders" :key="order.so_id" :value="order.so_id">
+                    {{ order.so_number }} - {{ order.customer ? order.customer.name : 'N/A' }}
+                  </option>
+                </select>
+                <div v-if="validationErrors.so_id" class="invalid-feedback">
+                  {{ validationErrors.so_id[0] }}
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="status">Status <span class="required">*</span></label>
+                <select
+                  id="status"
+                  v-model="form.status"
+                  class="form-control"
+                  :class="{ 'is-invalid': validationErrors.status }"
+                  required
+                >
+                  <option value="Draft">Draft</option>
+                  <option value="Open">Open</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Canceled">Canceled</option>
+                  <option value="Closed">Closed</option>
+                </select>
+                <div v-if="validationErrors.status" class="invalid-feedback">
+                  {{ validationErrors.status[0] }}
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="currency_code">Mata Uang</label>
+                <select
+                  id="currency_code"
+                  v-model="form.currency_code"
+                  class="form-control"
+                  :disabled="isEditMode"
+                >
+                  <option value="IDR">IDR - Indonesian Rupiah</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="SGD">SGD - Singapore Dollar</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row" v-if="currentSalesOrder">
+              <div class="form-group info-box">
+                <h4>Detail Sales Order</h4>
+                <div class="info-item">
+                  <div class="info-label">Pelanggan:</div>
+                  <div class="info-value">{{ currentSalesOrder.customer ? currentSalesOrder.customer.name : 'N/A' }}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Tanggal Order:</div>
+                  <div class="info-value">{{ formatDate(currentSalesOrder.so_date) }}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Total Order:</div>
+                  <div class="info-value">{{ formatCurrency(currentSalesOrder.total_amount, currentSalesOrder.currency_code) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Invoice Lines Card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Detail Item</h3>
+          </div>
+          <div class="card-body">
+            <div v-if="!availableItems.length" class="no-data">
+              <p>Silahkan pilih Sales Order terlebih dahulu.</p>
+            </div>
+            <table v-else class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px">Pilih</th>
+                  <th>Kode Item</th>
+                  <th>Deskripsi</th>
+                  <th>Qty Order</th>
+                  <th>Qty Invoice</th>
+                  <th>Harga Satuan</th>
+                  <th>Diskon</th>
+                  <th>Subtotal</th>
+                  <th>Pajak</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in availableItems" :key="item.line_id">
+                  <td>
+                    <input
+                      type="checkbox"
+                      :id="`item_${item.line_id}`"
+                      v-model="item.selected"
+                      @change="updateTotals"
+                    />
+                  </td>
+                  <td>{{ item.item ? item.item.item_code : 'N/A' }}</td>
+                  <td>{{ item.item ? item.item.name : 'N/A' }}</td>
+                  <td>{{ formatQuantity(item.quantity) }}</td>
+                  <td>
+                    <input
+                      type="number"
+                      v-model.number="item.invoice_quantity"
+                      class="form-control form-control-sm"
+                      :disabled="!item.selected"
+                      :max="item.quantity"
+                      :min="0.01"
+                      step="0.01"
+                      @input="updateLineTotals(item)"
+                    />
+                  </td>
+                  <td>{{ formatCurrency(item.unit_price) }}</td>
+                  <td>{{ formatCurrency(item.discount_per_unit * item.invoice_quantity) }}</td>
+                  <td>{{ formatCurrency(item.subtotal) }}</td>
+                  <td>{{ formatCurrency(item.tax) }}</td>
+                  <td>{{ formatCurrency(item.total) }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="7" class="text-right"><strong>Total:</strong></td>
+                  <td>{{ formatCurrency(totalSubtotal) }}</td>
+                  <td>{{ formatCurrency(totalTax) }}</td>
+                  <td>{{ formatCurrency(totalAmount) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" @click="goBack">Batal</button>
+          <button type="submit" class="btn btn-primary" :disabled="isSaving || !isFormValid">
+            <i v-if="isSaving" class="fas fa-spinner fa-spin"></i>
+            {{ isEditMode ? 'Update Invoice' : 'Buat Invoice' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </template>
-// Script section of SalesInvoiceForm.vue
+
 <script>
-import { ref, computed, onMounted, watch } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import SalesInvoiceService from "@/services/SalesInvoiceService";
-import UnitOfMeasureService from "@/services/UnitOfMeasureService";
-import axios from "axios";
+import axios from 'axios';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 export default {
-    name: "SalesInvoiceForm",
-    setup() {
-        const router = useRouter();
-        const route = useRoute();
-
-        // Form data
-        const form = ref({
-            invoice_number: "",
-            invoice_date: new Date().toISOString().substr(0, 10),
-            customer_id: "",
-            due_date: "",
-            so_id: "",
-            reference: "",
-            payment_terms: "",
-            status: "Draft",
-            currency_code: "",
-            exchange_rate: null,
-            base_currency: null,
-            base_currency_total: 0,
-            base_currency_tax: 0,
-            lines: [],
-        });
-
-        // Reference data
-        const customers = ref([]);
-        const items = ref([]);
-        const unitOfMeasures = ref([]);
-        const salesOrders = ref([]);
-        const currencies = ref(["USD", "IDR", "EUR", "JPY", "SGD", "MYR", "CNY"]);
-        const baseCurrency = ref("USD"); // Default base currency, should be loaded from config
-
-        // UI state
-        const isLoading = ref(false);
-        const isSubmitting = ref(false);
-        const error = ref("");
-
-        // Check if we're in edit mode
-        const isEditMode = computed(() => {
-            return route.params.id !== undefined;
-        });
-
-        // Generate a unique invoice number for new invoices
-        const generateInvoiceNumber = () => {
-            const today = new Date();
-            const year = today.getFullYear().toString().slice(-2);
-            const month = (today.getMonth() + 1).toString().padStart(2, "0");
-            const day = today.getDate().toString().padStart(2, "0");
-            const random = Math.floor(Math.random() * 1000)
-                .toString()
-                .padStart(3, "0");
-
-            return `INV${year}${month}${day}-${random}`;
-        };
-
-        // Load reference data
-        const loadReferenceData = async () => {
-            try {
-                // Load customers
-                const customersResponse = await axios.get("/customers");
-                customers.value = customersResponse.data.data;
-
-                // Load items
-                const itemsResponse = await axios.get("/items");
-                items.value = itemsResponse.data.data;
-
-                // Load unit of measures
-                const uomResponse = await UnitOfMeasureService.getAll();
-                unitOfMeasures.value = uomResponse.data || [];
-
-                // Get application settings including base currency
-                try {
-                    const settingsResponse = await axios.get("/settings/inventory");
-                    if (settingsResponse.data?.base_currency) {
-                        baseCurrency.value = settingsResponse.data.base_currency;
-                    }
-                } catch (settingErr) {
-                    console.warn("Could not load application settings:", settingErr);
-                }
-
-                // Load sales orders for the customer if selected
-                if (form.value.customer_id) {
-                    await loadSalesOrders();
-                }
-
-                // Set default currency
-                if (!form.value.currency_code) {
-                    form.value.currency_code = baseCurrency.value;
-                }
-            } catch (err) {
-                console.error("Error loading reference data:", err);
-                error.value = "Failed to load reference data.";
-            }
-        };
-
-        // Load sales orders for a customer
-        const loadSalesOrders = async () => {
-            if (!form.value.customer_id) return;
-
-            try {
-                const response = await axios.get("/orders", {
-                    params: {
-                        customer_id: form.value.customer_id,
-                        status: "Confirmed,Partially Delivered,Delivered", // Only get orders that can be invoiced
-                    },
-                });
-                salesOrders.value = response.data.data || [];
-            } catch (err) {
-                console.error("Error loading sales orders:", err);
-                salesOrders.value = [];
-            }
-        };
-
-        // Load customer data when customer changes
-        const loadCustomerData = async () => {
-            // Reset sales order when customer changes
-            form.value.so_id = "";
-
-            // Load sales orders for the selected customer
-            await loadSalesOrders();
-
-            // Find selected customer
-            const customer = customers.value.find(
-                (c) => c.customer_id === form.value.customer_id
-            );
-
-            if (customer) {
-                // Set preferred currency if available
-                if (customer.preferred_currency) {
-                    form.value.currency_code = customer.preferred_currency;
-                }
-
-                // Update payment terms from customer if available
-                if (customer.payment_terms) {
-                    form.value.payment_terms = customer.payment_terms;
-                }
-
-                // Calculate due date based on payment terms
-                calculateDueDate();
-            }
-        };
-
-        // Calculate due date based on payment terms
-        const calculateDueDate = () => {
-            const invoiceDate = new Date(form.value.invoice_date);
-            // Set default due date to 30 days from invoice date
-            let daysToAdd = 30;
-
-            // Parse payment terms to get days (e.g., "Net 15" -> 15 days)
-            const paymentTerms = form.value.payment_terms;
-            if (paymentTerms) {
-                const match = paymentTerms.match(/Net\s+(\d+)/i);
-                if (match && match[1]) {
-                    daysToAdd = parseInt(match[1], 10);
-                }
-            }
-
-            // Calculate due date
-            invoiceDate.setDate(invoiceDate.getDate() + daysToAdd);
-            form.value.due_date = invoiceDate.toISOString().substr(0, 10);
-        };
-
-        // Load order data when order is selected
-        const loadOrderData = async () => {
-            if (!form.value.so_id) {
-                // Clear lines if no order selected
-                form.value.lines = [];
-                return;
-            }
-
-            try {
-                const response = await axios.get(`/orders/${form.value.so_id}`);
-                const order = response.data.data;
-
-                // Set currency from sales order if available
-                if (order.currency_code) {
-                    form.value.currency_code = order.currency_code;
-                }
-
-                // Get exchange rate if needed
-                if (form.value.currency_code !== baseCurrency.value) {
-                    await getExchangeRate();
-                }
-
-                // Populate invoice lines from order lines, including delivered quantity
-                form.value.lines = (order.salesOrderLines || []).map(
-                    (line) => {
-                        // Calculate total delivered quantity from deliveryLines
-                        let deliveredQuantity = 0;
-                        if (line.deliveryLines && line.deliveryLines.length > 0) {
-                            deliveredQuantity = line.deliveryLines.reduce(
-                                (sum, dl) => sum + (dl.delivered_quantity || 0),
-                                0
-                            );
-                        }
-
-                        // Handle currency conversion if needed
-                        let unitPrice = line.unit_price;
-
-                        // If invoice currency differs from sales order currency
-                        if (form.value.currency_code !== order.currency_code) {
-                            // Convert from sales order currency to invoice currency via base currency
-                            if (line.base_currency_unit_price) {
-                                // First get price in base currency
-                                const baseUnitPrice = line.base_currency_unit_price;
-
-                                // Then convert to invoice currency if needed
-                                if (form.value.currency_code !== baseCurrency.value && form.value.exchange_rate) {
-                                    unitPrice = baseUnitPrice / form.value.exchange_rate;
-                                } else {
-                                    unitPrice = baseUnitPrice; // Already in base currency
-                                }
-                            }
-                        }
-
-                        return {
-                            item_id: line.item_id,
-                            unit_price: unitPrice,
-                            quantity: line.quantity,
-                            uom_id: line.uom_id,
-                            discount: line.discount || 0,
-                            tax: line.tax || 0,
-                            subtotal: 0, // Will be calculated
-                            total: 0, // Will be calculated
-                            so_line_id: line.line_id, // Reference to original order line
-                            delivered_quantity: deliveredQuantity, // New property for delivered qty
-                        };
-                    }
-                );
-
-                // Calculate line totals
-                form.value.lines.forEach((line, index) => {
-                    calculateLineTotals(index);
-                });
-
-                // Update payment terms if not already set
-                if (!form.value.payment_terms && order.payment_terms) {
-                    form.value.payment_terms = order.payment_terms;
-                    calculateDueDate();
-                }
-            } catch (err) {
-                console.error("Error loading order data:", err);
-                error.value = "Failed to load order data.";
-            }
-        };
-
-        // Get exchange rate for current currency
-        const getExchangeRate = async () => {
-            if (!form.value.currency_code || form.value.currency_code === baseCurrency.value) {
-                form.value.exchange_rate = 1;
-                form.value.base_currency = baseCurrency.value;
-                return;
-            }
-
-            try {
-                // Get current exchange rate
-                const rateResponse = await axios.get("/accounting/currency-rates/current-rate", {
-                    params: {
-                        from_currency: form.value.currency_code,
-                        to_currency: baseCurrency.value,
-                        date: form.value.invoice_date
-                    }
-                });
-
-                if (rateResponse.data && rateResponse.data.rate) {
-                    form.value.exchange_rate = rateResponse.data.rate;
-                    form.value.base_currency = baseCurrency.value;
-                } else {
-                    // Try reverse rate
-                    const reverseRateResponse = await axios.get("/accounting/currency-rates/current-rate", {
-                        params: {
-                            from_currency: baseCurrency.value,
-                            to_currency: form.value.currency_code,
-                            date: form.value.invoice_date
-                        }
-                    });
-
-                    if (reverseRateResponse.data && reverseRateResponse.data.rate) {
-                        form.value.exchange_rate = 1 / reverseRateResponse.data.rate;
-                        form.value.base_currency = baseCurrency.value;
-                    } else {
-                        error.value = `No exchange rate found for ${form.value.currency_code} to ${baseCurrency.value}`;
-                        // Reset to base currency
-                        form.value.currency_code = baseCurrency.value;
-                        form.value.exchange_rate = 1;
-                        form.value.base_currency = baseCurrency.value;
-                    }
-                }
-            } catch (err) {
-                console.error("Error getting exchange rate:", err);
-                error.value = `Could not get exchange rate: ${err.message}`;
-                // Reset to base currency
-                form.value.currency_code = baseCurrency.value;
-                form.value.exchange_rate = 1;
-                form.value.base_currency = baseCurrency.value;
-            }
-        };
-
-        // Load invoice data if in edit mode
-        const loadInvoice = async () => {
-            if (!isEditMode.value) {
-                // Generate a invoice number for new invoices
-                form.value.invoice_number = generateInvoiceNumber();
-
-                // Set default due date
-                const dueDate = new Date();
-                dueDate.setDate(dueDate.getDate() + 30);
-                form.value.due_date = dueDate.toISOString().substr(0, 10);
-
-                // Set default values
-                form.value.currency_code = baseCurrency.value;
-                form.value.base_currency = baseCurrency.value;
-                form.value.exchange_rate = 1;
-
-                return;
-            }
-
-            isLoading.value = true;
-            error.value = "";
-
-            try {
-                const response = await SalesInvoiceService.getInvoiceById(
-                    route.params.id
-                );
-                const invoice = response.data;
-
-                // Set form data
-                form.value = {
-                    invoice_id: invoice.invoice_id,
-                    invoice_number: invoice.invoice_number,
-                    invoice_date: invoice.invoice_date.substr(0, 10),
-                    customer_id: invoice.customer_id,
-                    due_date: invoice.due_date.substr(0, 10),
-                    so_id: invoice.so_id || "",
-                    reference: invoice.reference || "",
-                    payment_terms: invoice.payment_terms || "",
-                    status: invoice.status,
-                    currency_code: invoice.currency_code || baseCurrency.value,
-                    exchange_rate: invoice.exchange_rate || 1,
-                    base_currency: invoice.base_currency || baseCurrency.value,
-                    base_currency_total: invoice.base_currency_total || 0,
-                    base_currency_tax: invoice.base_currency_tax || 0,
-                    lines: [],
-                };
-
-                // Set line items
-                if (invoice.invoiceLines && invoice.invoiceLines.length > 0) {
-                    form.value.lines = invoice.invoiceLines.map((line) => ({
-                        line_id: line.line_id,
-                        item_id: line.item_id,
-                        unit_price: line.unit_price,
-                        quantity: line.quantity,
-                        uom_id: line.uom_id,
-                        discount: line.discount || 0,
-                        tax: line.tax || 0,
-                        subtotal: line.subtotal,
-                        total: line.total,
-                        so_line_id: line.so_line_id,
-                        base_currency_unit_price: line.base_currency_unit_price,
-                        base_currency_subtotal: line.base_currency_subtotal,
-                        base_currency_tax: line.base_currency_tax,
-                        base_currency_total: line.base_currency_total
-                    }));
-                }
-
-                // Load sales orders after setting customer
-                await loadSalesOrders();
-            } catch (err) {
-                console.error("Error loading invoice:", err);
-                error.value = "Failed to load invoice data.";
-            } finally {
-                isLoading.value = false;
-            }
-        };
-
-        // Add a new line item
-        const addLine = () => {
-            form.value.lines.push({
-                item_id: "",
-                unit_price: 0,
-                quantity: 1,
-                uom_id: "",
-                discount: 0,
-                tax: 0,
-                subtotal: 0,
-                total: 0,
-            });
-        };
-
-        // Remove a line item
-        const removeLine = (index) => {
-            form.value.lines.splice(index, 1);
-        };
-
-        // Update item info when item is selected
-        const updateItemInfo = async (index) => {
-            const line = form.value.lines[index];
-            const selectedItem = items.value.find(
-                (item) => item.item_id === line.item_id
-            );
-
-            if (selectedItem) {
-                // Set UOM if not already set
-                if (!line.uom_id && selectedItem.uom_id) {
-                    line.uom_id = selectedItem.uom_id;
-                }
-
-                // Set unit price if it's 0 (for new lines)
-                if (line.unit_price === 0) {
-                    try {
-                        // Try to get price in the invoice currency
-                        const priceResponse = await axios.get(`/items/${selectedItem.item_id}/best-sale-price`, {
-                            params: {
-                                customer_id: form.value.customer_id,
-                                quantity: line.quantity,
-                                currency_code: form.value.currency_code,
-                                date: form.value.invoice_date
-                            }
-                        });
-
-                        if (priceResponse.data && priceResponse.data.price) {
-                            line.unit_price = priceResponse.data.price;
-                        } else {
-                            // Fallback to default sale price
-                            line.unit_price = selectedItem.sale_price || 0;
-                        }
-                    } catch (err) {
-                        console.warn("Could not get best sale price:", err);
-                        // Use default price
-                        line.unit_price = selectedItem.sale_price || 0;
-                    }
-                }
-
-                // Calculate totals
-                calculateLineTotals(index);
-            }
-        };
-
-        // Calculate line totals
-        const calculateLineTotals = (index) => {
-            const line = form.value.lines[index];
-
-            // Calculate subtotal (unit_price * quantity)
-            line.subtotal =
-                parseFloat(line.unit_price) * parseFloat(line.quantity);
-
-            // Calculate total (subtotal - discount + tax)
-            line.total = line.subtotal - (line.discount || 0) + (line.tax || 0);
-
-            // Calculate base currency amounts if exchange rate is available
-            if (form.value.exchange_rate) {
-                line.base_currency_unit_price = line.unit_price * form.value.exchange_rate;
-                line.base_currency_subtotal = line.subtotal * form.value.exchange_rate;
-                line.base_currency_discount = (line.discount || 0) * form.value.exchange_rate;
-                line.base_currency_tax = (line.tax || 0) * form.value.exchange_rate;
-                line.base_currency_total = line.total * form.value.exchange_rate;
-            }
-        };
-
-        // Calculate subtotal of all lines
-        const calculateSubtotal = () => {
-            return form.value.lines.reduce(
-                (sum, line) => sum + (line.subtotal || 0),
-                0
-            );
-        };
-
-        // Calculate total discount of all lines
-        const calculateTotalDiscount = () => {
-            return form.value.lines.reduce(
-                (sum, line) => sum + (line.discount || 0),
-                0
-            );
-        };
-
-        // Calculate total tax of all lines
-        const calculateTotalTax = () => {
-            return form.value.lines.reduce(
-                (sum, line) => sum + (line.tax || 0),
-                0
-            );
-        };
-
-        // Calculate grand total of all lines
-        const calculateGrandTotal = () => {
-            return form.value.lines.reduce(
-                (sum, line) => sum + (line.total || 0),
-                0
-            );
-        };
-
-        // Format currency
-        const formatCurrency = (value, currencyCode) => {
-            const code = currencyCode || form.value.currency_code || "IDR";
-            return new Intl.NumberFormat("id-ID", {
-                style: "currency",
-                currency: code,
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2,
-            }).format(value || 0);
-        };
-
-        // Go back to the previous page
-        const goBack = () => {
-            router.push("/sales/invoices");
-        };
-
-        // Save the invoice
-        const saveInvoice = async () => {
-            // Validate form
-            if (
-                !form.value.invoice_number ||
-                !form.value.invoice_date ||
-                !form.value.customer_id ||
-                !form.value.due_date ||
-                !form.value.currency_code
-            ) {
-                error.value = "Please fill in all required fields.";
-                return;
-            }
-
-            // Validate line items
-            if (form.value.lines.length === 0) {
-                error.value = "Invoice must have at least one item.";
-                return;
-            }
-
-            for (let i = 0; i < form.value.lines.length; i++) {
-                const line = form.value.lines[i];
-                if (
-                    !line.item_id ||
-                    !line.unit_price ||
-                    !line.quantity ||
-                    !line.uom_id
-                ) {
-                    error.value = `Item #${i + 1} has incomplete data.`;
-                    return;
-                }
-            }
-
-            isSubmitting.value = true;
-            error.value = "";
-
-            try {
-                // Make sure we have a valid exchange rate
-                if (!form.value.exchange_rate && form.value.currency_code !== baseCurrency.value) {
-                    await getExchangeRate();
-                }
-
-                // Calculate base currency totals
-                const totalAmount = calculateGrandTotal();
-                const taxAmount = calculateTotalTax();
-
-                const invoiceData = {
-                    ...form.value,
-                    total_amount: totalAmount,
-                    tax_amount: taxAmount,
-                    base_currency_total: totalAmount * (form.value.exchange_rate || 1),
-                    base_currency_tax: taxAmount * (form.value.exchange_rate || 1)
-                };
-
-                if (isEditMode.value) {
-                    // Update existing invoice
-                    await SalesInvoiceService.updateInvoice(
-                        form.value.invoice_id,
-                        invoiceData
-                    );
-                    alert("Invoice updated successfully!");
-                } else {
-                    // Create new invoice
-                    await SalesInvoiceService.createInvoice(invoiceData);
-                    alert("Invoice created successfully!");
-                }
-
-                // Redirect to invoices list
-                router.push("/sales/invoices");
-            } catch (err) {
-                console.error("Error saving invoice:", err);
-
-                if (
-                    err.response &&
-                    err.response.data &&
-                    err.response.data.errors
-                ) {
-                    const errors = err.response.data.errors;
-                    const firstError = Object.values(errors)[0][0];
-                    error.value = firstError;
-                } else if (
-                    err.response &&
-                    err.response.data &&
-                    err.response.data.message
-                ) {
-                    error.value = err.response.data.message;
-                } else {
-                    error.value = "Failed to save invoice. Please try again.";
-                }
-            } finally {
-                isSubmitting.value = false;
-            }
-        };
-
-        // Watch for invoice date changes to update due date
-        watch(
-            () => form.value.invoice_date,
-            () => {
-                if (form.value.invoice_date) {
-                    calculateDueDate();
-                }
-            }
+  name: 'SalesInvoiceForm',
+  setup() {
+    const route = useRoute();
+    const router = useRouter();
+    const isLoading = ref(true);
+    const isSaving = ref(false);
+    const error = ref(null);
+    const validationErrors = ref({});
+    const salesOrders = ref([]);
+    const currentSalesOrder = ref(null);
+    const availableItems = ref([]);
+
+    // Form state
+    const form = ref({
+      invoice_number: '',
+      invoice_date: new Date().toISOString().split('T')[0],
+      due_date: '',
+      so_id: '',
+      status: 'Draft',
+      currency_code: 'IDR',
+      lines: []
+    });
+
+    // Computed properties
+    const isEditMode = computed(() => !!route.params.id);
+
+    const invoiceId = computed(() => route.params.id);
+
+    const totalSubtotal = computed(() => {
+      return availableItems.value
+        .filter(item => item.selected)
+        .reduce((sum, item) => sum + item.subtotal, 0);
+    });
+
+    const totalTax = computed(() => {
+      return availableItems.value
+        .filter(item => item.selected)
+        .reduce((sum, item) => sum + item.tax, 0);
+    });
+
+    const totalAmount = computed(() => {
+      return availableItems.value
+        .filter(item => item.selected)
+        .reduce((sum, item) => sum + item.total, 0);
+    });
+
+    const isFormValid = computed(() => {
+      return form.value.invoice_number &&
+             form.value.invoice_date &&
+             form.value.due_date &&
+             form.value.so_id &&
+             form.value.status &&
+             availableItems.value.some(item => item.selected);
+    });
+
+    // Methods
+    const loadSalesOrders = async () => {
+      try {
+        const response = await axios.get('/api/orders');
+        salesOrders.value = response.data.data.filter(order =>
+          ['Confirmed', 'Delivered'].includes(order.status)
         );
+      } catch (err) {
+        console.error('Error loading sales orders:', err);
+        error.value = 'Gagal memuat daftar sales order. Silakan coba lagi.';
+      }
+    };
 
-        // Watch for currency changes to update exchange rate
-        watch(
-            () => form.value.currency_code,
-            async (newVal, oldVal) => {
-                if (newVal && newVal !== oldVal) {
-                    await getExchangeRate();
+    const loadSalesOrder = async () => {
+      if (!form.value.so_id) {
+        currentSalesOrder.value = null;
+        availableItems.value = [];
+        return;
+      }
 
-                    // Recalculate all line totals with new currency
-                    form.value.lines.forEach((_, index) => {
-                        calculateLineTotals(index);
-                    });
-                }
-            }
-        );
+      try {
+        const response = await axios.get(`/api/orders/${form.value.so_id}`);
+        currentSalesOrder.value = response.data.data;
 
-        onMounted(async () => {
-            await loadReferenceData();
-            await loadInvoice();
+        // Set default due date based on payment terms if available
+        if (currentSalesOrder.value.payment_terms) {
+          const terms = parseInt(currentSalesOrder.value.payment_terms);
+          if (!isNaN(terms)) {
+            const dueDate = new Date(form.value.invoice_date);
+            dueDate.setDate(dueDate.getDate() + terms);
+            form.value.due_date = dueDate.toISOString().split('T')[0];
+          }
+        }
+
+        // Setup invoice items from order lines
+        availableItems.value = currentSalesOrder.value.salesOrderLines.map(line => {
+          // Calculate per unit values for easier calculation when quantity changes
+          const discount_per_unit = line.discount / line.quantity;
+          const tax_per_unit = line.tax / line.quantity;
+
+          return {
+            ...line,
+            selected: isEditMode.value ? false : true, // By default select all items for new invoice
+            invoice_quantity: line.quantity, // Default to full quantity
+            discount_per_unit,
+            tax_per_unit,
+            subtotal: line.unit_price * line.quantity,
+            tax: line.tax,
+            total: (line.unit_price * line.quantity) - line.discount + line.tax
+          };
         });
 
-        return {
-            form,
-            customers,
-            items,
-            unitOfMeasures,
-            salesOrders,
-            currencies,
-            baseCurrency,
-            isLoading,
-            isSubmitting,
-            error,
-            isEditMode,
-            addLine,
-            removeLine,
-            updateItemInfo,
-            calculateLineTotals,
-            calculateSubtotal,
-            calculateTotalDiscount,
-            calculateTotalTax,
-            calculateGrandTotal,
-            formatCurrency,
-            goBack,
-            saveInvoice,
-            loadCustomerData,
-            loadOrderData,
-            getExchangeRate
+        // Set currency from order
+        if (currentSalesOrder.value.currency_code) {
+          form.value.currency_code = currentSalesOrder.value.currency_code;
+        }
+
+        // Update totals
+        updateTotals();
+
+      } catch (err) {
+        console.error('Error loading sales order details:', err);
+        error.value = 'Gagal memuat detail sales order. Silakan coba lagi.';
+      }
+    };
+
+    const updateLineTotals = (item) => {
+      if (!item.selected || item.invoice_quantity <= 0) {
+        item.subtotal = 0;
+        item.tax = 0;
+        item.total = 0;
+        return;
+      }
+
+      // Recalculate totals based on invoice quantity
+      item.subtotal = item.unit_price * item.invoice_quantity;
+      item.discount = item.discount_per_unit * item.invoice_quantity;
+      item.tax = item.tax_per_unit * item.invoice_quantity;
+      item.total = item.subtotal - item.discount + item.tax;
+
+      updateTotals();
+    };
+
+    const updateTotals = () => {
+      // This will trigger the computed properties to recalculate
+      availableItems.value.forEach(item => {
+        if (!item.selected) {
+          item.subtotal = 0;
+          item.tax = 0;
+          item.total = 0;
+        } else {
+          updateLineTotals(item);
+        }
+      });
+    };
+
+    const loadInvoice = async () => {
+      try {
+        const response = await axios.get(`/api/invoices/${invoiceId.value}`);
+        const invoice = response.data.data;
+
+        // Fill form with invoice data
+        form.value = {
+          invoice_number: invoice.invoice_number,
+          invoice_date: new Date(invoice.invoice_date).toISOString().split('T')[0],
+          due_date: new Date(invoice.due_date).toISOString().split('T')[0],
+          so_id: invoice.so_id,
+          status: invoice.status,
+          currency_code: invoice.currency_code || 'IDR'
         };
-    },
+
+        // Need to load the SO to get the available items
+        await loadSalesOrder();
+
+        // Match invoice lines with order lines and set quantities
+        if (invoice.salesInvoiceLines && invoice.salesInvoiceLines.length > 0) {
+          invoice.salesInvoiceLines.forEach(invoiceLine => {
+            const matchingItem = availableItems.value.find(
+              item => item.line_id === invoiceLine.so_line_id
+            );
+
+            if (matchingItem) {
+              matchingItem.selected = true;
+              matchingItem.invoice_quantity = invoiceLine.quantity;
+              updateLineTotals(matchingItem);
+            }
+          });
+        }
+
+      } catch (err) {
+        console.error('Error loading invoice:', err);
+        error.value = 'Gagal memuat data invoice. Silakan coba lagi.';
+      }
+    };
+
+    const prepareFormData = () => {
+      const selectedLines = availableItems.value
+        .filter(item => item.selected)
+        .map(item => ({
+          so_line_id: item.line_id,
+          quantity: item.invoice_quantity
+        }));
+
+      return {
+        ...form.value,
+        lines: selectedLines
+      };
+    };
+
+    const saveInvoice = async () => {
+      validationErrors.value = {};
+      isSaving.value = true;
+
+      try {
+        const formData = prepareFormData();
+
+        let response;
+        if (isEditMode.value) {
+          response = await axios.put(`/api/invoices/${invoiceId.value}`, formData);
+        } else {
+          response = await axios.post('/api/invoices', formData);
+        }
+
+        router.push(`/sales/invoices/${response.data.data.invoice_id}`);
+      } catch (err) {
+        console.error('Error saving invoice:', err);
+
+        if (err.response && err.response.status === 422) {
+          validationErrors.value = err.response.data.errors;
+        } else {
+          error.value = 'Gagal menyimpan invoice. Silakan coba lagi.';
+        }
+      } finally {
+        isSaving.value = false;
+      }
+    };
+
+    const goBack = () => {
+      router.go(-1);
+    };
+
+    const retry = () => {
+      error.value = null;
+      if (isEditMode.value) {
+        loadInvoice();
+      } else {
+        loadSalesOrders();
+      }
+    };
+
+    const formatDate = (dateString) => {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    };
+
+    const formatCurrency = (amount, currency) => {
+      if (amount === undefined || amount === null) return 'N/A';
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: currency || form.value.currency_code || 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(amount);
+    };
+
+    const formatQuantity = (qty) => {
+      if (qty === undefined || qty === null) return 'N/A';
+      return new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+      }).format(qty);
+    };
+
+    // Watch for changes to invoice date to update due date
+    watch(() => form.value.invoice_date, (newDate) => {
+      if (!newDate || form.value.due_date) return;
+
+      // Default due date to 30 days after invoice date
+      const dueDate = new Date(newDate);
+      dueDate.setDate(dueDate.getDate() + 30);
+      form.value.due_date = dueDate.toISOString().split('T')[0];
+    });
+
+    // Initialize
+    onMounted(async () => {
+      try {
+        if (isEditMode.value) {
+          await loadInvoice();
+        } else {
+          await loadSalesOrders();
+        }
+      } catch (err) {
+        console.error('Error during initialization:', err);
+        error.value = 'Terjadi kesalahan saat memuat halaman. Silakan coba lagi.';
+      } finally {
+        isLoading.value = false;
+      }
+    });
+
+    return {
+      form,
+      isLoading,
+      isSaving,
+      error,
+      validationErrors,
+      salesOrders,
+      currentSalesOrder,
+      availableItems,
+      isEditMode,
+      invoiceId,
+      totalSubtotal,
+      totalTax,
+      totalAmount,
+      isFormValid,
+      loadSalesOrders,
+      loadSalesOrder,
+      updateLineTotals,
+      updateTotals,
+      saveInvoice,
+      goBack,
+      retry,
+      formatDate,
+      formatCurrency,
+      formatQuantity
+    };
+  }
 };
 </script>
-<!-- Style section of SalesInvoiceForm.vue -->
+
 <style scoped>
-.invoice-form {
-    padding: 1rem 0;
+.page-content {
+  padding: 1rem;
 }
 
 .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
 }
 
-.page-header h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0;
-    color: var(--gray-800);
+.page-title {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--gray-800);
 }
 
-.page-actions {
-    display: flex;
-    gap: 0.75rem;
-}
-
-.alert {
-    padding: 1rem;
-    border-radius: 0.375rem;
-    margin-bottom: 1.5rem;
-}
-
-.alert-danger {
-    background-color: var(--danger-bg);
-    color: var(--danger-color);
-    border: 1px solid var(--danger-light);
-}
-
-.form-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.form-card {
-    background-color: white;
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+.card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
 }
 
 .card-header {
-    background-color: var(--gray-50);
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--gray-200);
 }
 
-.card-header h2 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin: 0;
-    color: var(--gray-800);
+.card-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--gray-800);
 }
 
 .card-body {
-    padding: 1.5rem;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group:last-child {
-    margin-bottom: 0;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: var(--gray-700);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 0.625rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-    border-color: var(--primary-color);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-group input.readonly {
-    background-color: var(--gray-50);
-    cursor: not-allowed;
-}
-
-.text-muted {
-    color: var(--gray-500);
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-}
-
-.exchange-rate-display {
-    background-color: var(--gray-100);
-    padding: 0.625rem;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.empty-lines {
-    text-align: center;
-    padding: 2rem;
-    color: var(--gray-500);
-    background-color: var(--gray-50);
-    border: 1px dashed var(--gray-300);
-    border-radius: 0.375rem;
-}
-
-.invoice-lines {
-    border: 1px solid var(--gray-200);
-    border-radius: 0.375rem;
-    overflow: hidden;
-}
-
-.line-headers {
-    display: grid;
-    grid-template-columns: 3fr 1fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 0.5fr;
-    gap: 0.5rem;
-    background-color: var(--gray-50);
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.line-header {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--gray-600);
-}
-
-.invoice-line {
-    display: grid;
-    grid-template-columns: 3fr 1fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 0.5fr;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--gray-200);
-    align-items: center;
-}
-
-.invoice-line:last-child {
-    border-bottom: none;
-}
-
-.line-item input,
-.line-item select {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-}
-
-.line-item.subtotal,
-.line-item.total {
-    font-weight: 500;
-    text-align: right;
-}
-
-.line-item.total {
-    color: var(--primary-color);
-}
-
-.line-item.actions {
-    text-align: center;
-}
-
-.btn-icon {
-    background: none;
-    border: none;
-    color: var(--gray-500);
-    cursor: pointer;
-    padding: 0.375rem;
-    border-radius: 0.25rem;
-}
-
-.btn-icon:hover {
-    background-color: var(--gray-100);
-}
-
-.btn-icon.delete:hover {
-    color: var(--danger-color);
-    background-color: var(--danger-bg);
-}
-
-.invoice-totals {
-    border-top: 1px solid var(--gray-200);
-    padding: 1rem;
-    background-color: var(--gray-50);
-}
-
-.total-row {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-.total-row:last-child {
-    margin-bottom: 0;
-}
-
-.total-label {
-    font-weight: 500;
-    color: var(--gray-700);
-    width: 10rem;
-    text-align: right;
-}
-
-.total-value {
-    width: 10rem;
-    text-align: right;
-    font-weight: 500;
-}
-
-.grand-total .total-label,
-.grand-total .total-value {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--gray-800);
-}
-
-.base-currency .total-label,
-.base-currency .total-value {
-    font-style: italic;
-    color: var(--gray-600);
-}
-
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 1rem;
+  padding: 1.5rem;
 }
 
 .btn {
-    padding: 0.625rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: none;
-    transition: background-color 0.2s, color 0.2s;
-}
-
-.btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .btn-primary {
-    background-color: var(--primary-color);
-    color: white;
+  background-color: var(--primary-color);
+  color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background-color: var(--primary-dark);
-}
-
-.btn-primary:disabled {
-    background-color: var(--primary-light);
-    opacity: 0.7;
-    cursor: not-allowed;
+  background-color: var(--primary-dark);
 }
 
 .btn-secondary {
-    background-color: var(--gray-200);
-    color: var(--gray-800);
+  background-color: var(--gray-100);
+  border-color: var(--gray-300);
+  color: var(--gray-700);
 }
 
 .btn-secondary:hover {
-    background-color: var(--gray-300);
+  background-color: var(--gray-200);
 }
 
-@media (max-width: 1024px) {
-    .form-row {
-        grid-template-columns: 1fr;
-        gap: 0;
-    }
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 
-    .invoice-line,
-    .line-headers {
-        grid-template-columns: repeat(8, 1fr) 0.5fr;
-        font-size: 0.75rem;
-        padding: 0.5rem;
-        gap: 0.25rem;
-    }
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: -0.5rem;
+  margin-bottom: 1rem;
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+.form-group {
+  flex: 1;
+  min-width: 250px;
+  padding: 0.5rem;
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--gray-800);
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid var(--gray-300);
+  border-radius: 0.375rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.form-control:focus {
+  border-color: #90cdf4;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(66, 153, 225, 0.25);
+}
+
+.form-control:disabled {
+  background-color: var(--gray-100);
+  opacity: 1;
+}
+
+.form-control.is-invalid {
+  border-color: var(--danger-color);
+}
+
+.invalid-feedback {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 80%;
+  color: var(--danger-color);
+}
+
+label {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.required {
+  color: var(--danger-color);
+}
+
+.info-box {
+  background-color: var(--gray-50);
+  border-radius: 0.375rem;
+  padding: 1rem;
+  box-shadow: inset 0 0 0 1px var(--gray-200);
+}
+
+.info-box h4 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  color: var(--gray-700);
+}
+
+.info-item {
+  display: flex;
+  margin-bottom: 0.5rem;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  width: 40%;
+}
+
+.info-value {
+  font-size: 0.875rem;
+  color: var(--gray-800);
+  font-weight: 500;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.data-table th {
+  font-weight: 500;
+  color: var(--gray-600);
+  background-color: var(--gray-50);
+}
+
+.data-table tbody tr:hover {
+  background-color: var(--gray-50);
+}
+
+.data-table tfoot {
+  background-color: var(--gray-50);
+}
+
+.data-table tfoot td {
+  font-weight: 500;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.loading-container, .error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+}
+
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--gray-500);
+}
+
+.loading-indicator i {
+  font-size: 2rem;
+}
+
+.error-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--danger-color);
+  margin-bottom: 1.5rem;
+}
+
+.error-message i {
+  font-size: 2rem;
+}
+
+.no-data {
+  padding: 2rem;
+  text-align: center;
+  color: var(--gray-500);
 }
 
 @media (max-width: 768px) {
-    .page-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
+  .form-group {
+    min-width: 100%;
+  }
 
-    .invoice-line,
-    .line-headers {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        padding: 1rem;
-    }
+  .data-table {
+    font-size: 0.875rem;
+  }
 
-    .line-header {
-        display: none;
-    }
-
-    .line-item {
-        display: flex;
-        align-items: center;
-        width: 100%;
-    }
-
-    .line-item::before {
-        content: attr(data-label);
-        font-weight: 500;
-        width: 8rem;
-        text-align: left;
-    }
-
-    .total-row {
-        flex-direction: column;
-        align-items: flex-end;
-    }
-
-    .total-label,
-    .total-value {
-        width: auto;
-    }
+  .data-table th, .data-table td {
+    padding: 0.5rem;
+  }
 }
 </style>
