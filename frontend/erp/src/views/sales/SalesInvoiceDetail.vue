@@ -298,19 +298,37 @@ export default {
       isLoading.value = true;
       error.value = null;
 
-      try {
-        const response = await axios.get(`/api/invoices/${invoiceId.value}`);
-        invoice.value = response.data.data;
-        invoiceLines.value = response.data.data.salesInvoiceLines || [];
-        receivables.value = response.data.data.customerReceivables || [];
-        relatedReturns.value = response.data.data.salesReturns || [];
-      } catch (err) {
-        console.error('Error fetching invoice:', err);
-        error.value = 'Gagal memuat data invoice. Silakan coba lagi.';
-      } finally {
-        isLoading.value = false;
-      }
-    };
+    try {
+    // Change this line from:
+    // const response = await axios.get(`/api/invoices/${invoiceId.value}`);
+    // To:
+    const response = await axios.get(`/api/sales/invoices/${invoiceId.value}`);
+
+    invoice.value = response.data.data;
+    invoiceLines.value = response.data.data.salesInvoiceLines || [];
+    receivables.value = response.data.data.customerReceivables || [];
+    relatedReturns.value = response.data.data.salesReturns || [];
+  } catch (err) {
+    console.error('Error fetching invoice:', err);
+    error.value = 'Gagal memuat data invoice. Silakan coba lagi.';
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+    //   try {
+    //     const response = await axios.get(`/api/invoices/${invoiceId.value}`);
+    //     invoice.value = response.data.data;
+    //     invoiceLines.value = response.data.data.salesInvoiceLines || [];
+    //     receivables.value = response.data.data.customerReceivables || [];
+    //     relatedReturns.value = response.data.data.salesReturns || [];
+    //   } catch (err) {
+    //     console.error('Error fetching invoice:', err);
+    //     error.value = 'Gagal memuat data invoice. Silakan coba lagi.';
+    //   } finally {
+    //     isLoading.value = false;
+    //   }
+    // };
 
     const goBack = () => {
       router.go(-1);

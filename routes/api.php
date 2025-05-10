@@ -550,8 +550,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('currency-rates/current-rate', [App\Http\Controllers\Api\CurrencyRateController::class, 'getCurrentRate']);
 
         // Sales Invoice Routes
-        Route::group(['prefix' => 'sales/invoices'], function () {
+        Route::prefix('sales/invoices')->group(function () {
             Route::get('/', [SalesInvoiceController::class, 'index']);
+            Route::post('/', [SalesInvoiceController::class, 'store']);
+            Route::post('/from-order', [SalesInvoiceController::class, 'createFromOrder']);
             Route::post('/from-delivery-orders', [SalesInvoiceController::class, 'createFromDeliveryOrders']);
             Route::get('/{id}', [SalesInvoiceController::class, 'show']);
             Route::put('/{id}', [SalesInvoiceController::class, 'update']);
@@ -561,5 +563,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{id}/cancel', [SalesInvoiceController::class, 'cancel']);
             Route::post('/get-exchange-rate', [SalesInvoiceController::class, 'getExchangeRate']);
         });
+        // Route::group(['prefix' => 'sales/invoices'], function () {
+        //     Route::get('/', [SalesInvoiceController::class, 'index']);
+        //     Route::post('/from-delivery-orders', [SalesInvoiceController::class, 'createFromDeliveryOrders']);
+        //     Route::get('/{id}', [SalesInvoiceController::class, 'show']);
+        //     Route::put('/{id}', [SalesInvoiceController::class, 'update']);
+        //     Route::delete('/{id}', [SalesInvoiceController::class, 'destroy']);
+        //     Route::get('/{id}/payment-info', [SalesInvoiceController::class, 'paymentInfo']);
+        //     Route::post('/{id}/validate', [SalesInvoiceController::class, 'validate']);
+        //     Route::post('/{id}/cancel', [SalesInvoiceController::class, 'cancel']);
+        //     Route::post('/get-exchange-rate', [SalesInvoiceController::class, 'getExchangeRate']);
+        // });
     });
 });

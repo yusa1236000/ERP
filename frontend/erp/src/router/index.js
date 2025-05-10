@@ -413,6 +413,13 @@ const routes = [
                 meta: { requiresAuth: true },
             },
             {
+                path: "/sales/invoices/create-from-order",
+                name: "CreateInvoiceFromOrder",
+                component: () =>
+                    import("../views/sales/CreateInvoiceFromOrder.vue"),
+                meta: { requiresAuth: true },
+            },
+            {
                 path: "/sales/invoices/:id",
                 name: "SalesInvoiceDetail",
                 component: SalesInvoiceDetail,

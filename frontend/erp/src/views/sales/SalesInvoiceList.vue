@@ -192,18 +192,19 @@ export default {
     const invoiceToDelete = ref(null);
 
     // Fetch invoices from API
-        const fetchInvoices = async () => {
-          isLoading.value = true;
-          try {
-            const response = await axios.get('sales/invoices');
-            invoices.value = response.data.data;
-          } catch (error) {
-            console.error('Error fetching invoices:', error);
-            alert('Gagal memuat data invoice. Silakan coba lagi.');
-          } finally {
-            isLoading.value = false;
-          }
-        };
+    const fetchInvoices = async () => {
+    isLoading.value = true;
+    try {
+        // Change this line to match the correct API endpoint
+        const response = await axios.get('accounting/sales/invoices');
+        invoices.value = response.data.data;
+    } catch (error) {
+        console.error('Error fetching invoices:', error);
+        alert('Gagal memuat data invoice. Silakan coba lagi.');
+    } finally {
+        isLoading.value = false;
+    }
+    };
 
     // Filter invoices based on search and filters
     const filteredInvoices = computed(() => {

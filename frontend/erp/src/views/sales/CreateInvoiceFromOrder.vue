@@ -288,7 +288,7 @@ export default {
       error.value = null;
 
       try {
-        const response = await axios.get('/api/orders');
+        const response = await axios.get('orders');
         // Filter to only get orders that are eligible for invoicing
         salesOrders.value = response.data.data.filter(order =>
           ['Confirmed', 'Delivered'].includes(order.status)
@@ -311,7 +311,7 @@ export default {
       error.value = null;
 
       try {
-        const response = await axios.get(`/api/orders/${form.value.so_id}`);
+        const response = await axios.get(`orders/${form.value.so_id}`);
         selectedOrder.value = response.data.data;
 
         // Update currency code
