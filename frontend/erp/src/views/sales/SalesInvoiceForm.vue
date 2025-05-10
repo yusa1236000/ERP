@@ -294,9 +294,9 @@ export default {
     });
 
     // Methods
-    const loadSalesOrders = async () => {
+const loadSalesOrders = async () => {
       try {
-        const response = await axios.get('/api/orders');
+        const response = await axios.get('/orders');
         salesOrders.value = response.data.data.filter(order =>
           ['Confirmed', 'Delivered'].includes(order.status)
         );
@@ -306,7 +306,7 @@ export default {
       }
     };
 
-    const loadSalesOrder = async () => {
+const loadSalesOrder = async () => {
       if (!form.value.so_id) {
         currentSalesOrder.value = null;
         availableItems.value = [];
@@ -314,7 +314,7 @@ export default {
       }
 
       try {
-        const response = await axios.get(`/api/orders/${form.value.so_id}`);
+        const response = await axios.get(`/orders/${form.value.so_id}`);
         currentSalesOrder.value = response.data.data;
 
         // Set default due date based on payment terms if available

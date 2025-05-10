@@ -563,16 +563,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{id}/cancel', [SalesInvoiceController::class, 'cancel']);
             Route::post('/get-exchange-rate', [SalesInvoiceController::class, 'getExchangeRate']);
         });
-        // Route::group(['prefix' => 'sales/invoices'], function () {
-        //     Route::get('/', [SalesInvoiceController::class, 'index']);
-        //     Route::post('/from-delivery-orders', [SalesInvoiceController::class, 'createFromDeliveryOrders']);
-        //     Route::get('/{id}', [SalesInvoiceController::class, 'show']);
-        //     Route::put('/{id}', [SalesInvoiceController::class, 'update']);
-        //     Route::delete('/{id}', [SalesInvoiceController::class, 'destroy']);
-        //     Route::get('/{id}/payment-info', [SalesInvoiceController::class, 'paymentInfo']);
-        //     Route::post('/{id}/validate', [SalesInvoiceController::class, 'validate']);
-        //     Route::post('/{id}/cancel', [SalesInvoiceController::class, 'cancel']);
-        //     Route::post('/get-exchange-rate', [SalesInvoiceController::class, 'getExchangeRate']);
-        // });
+
+        // Route untuk outstanding PO
+        Route::get('purchase-orders/{purchaseOrder}/outstanding', [PurchaseOrderController::class, 'showOutstanding']);
+        Route::get('purchase-orders/outstanding/all', [PurchaseOrderController::class, 'getAllOutstanding']);
+        Route::get('purchase-orders/reports/outstanding-items', [PurchaseOrderController::class, 'outstandingItemsReport']);
     });
 });
